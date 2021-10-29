@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">VK Music Player</string>
+    <string name="login">Login</string>
+    <string name="sign_in">Sign in</string>
+    <string name="exit">Exit</string>
+    <string name="invalid_credentials">Invalid username or password</string>
+    <string name="failed_audio_loading">Error loading audio</string>
+</resources>
