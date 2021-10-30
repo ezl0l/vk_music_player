@@ -2,6 +2,7 @@ package com.ezlol.vkmusicplayer;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -40,7 +41,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener, SeekBar.OnSeekBarChangeListener, MediaPlayer.OnCompletionListener {
+    private Context context;
     AppAPI.Auth authLink;
 
     ScrollView scrollView;
@@ -56,15 +58,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     MediaPlayer mediaPlayer = new MediaPlayer();
 
-    private int currentTrack = 0;
-    ArrayList<JSONObject> tracksData = new ArrayList<>();
+    private int currentTrack = 0, currentTrackNumber = 0;
+    static List<LinearLayout> tracksList = new ArrayList<>();
+    static Map<LinearLayout, JSONObject> tracksLayouts = new HashMap<>();
 
     private boolean isCurrentTrackLayoutShow = false;
+    private boolean isAudioHandlerTaskWork = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        context = this;
 
         scrollView = findViewById(R.id.scrollView);
         tracksLayout = findViewById(R.id.tracks);
@@ -114,6 +120,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         BCTPauseBtn.setOnClickListener(this);
         BCTNextBtn.setOnClickListener(this);
         bottomCurrentTrackLayout.setOnClickListener(this);
+        currentTrackSeekBar.setOnSeekBarChangeListener(this);
 
         LoadingAudio loadingAudioTask = new LoadingAudio();
         loadingAudioTask.execute();
@@ -165,6 +172,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 exitBtn.setVisibility(View.GONE);
                 currentTrackLayout.setVisibility(View.VISIBLE);
                 isCurrentTrackLayoutShow = true;
+                new AudioHandlerTask().execute();
                 break;
             }
 
@@ -197,6 +205,68 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
+    @Override
+    public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+        if(b){
+            mediaPlayer.seekTo(i * 1000);
+        }
+        Log.e("SEEKBAR", i + " - " + b);
+    }
+
+    @Override
+    public void onStartTrackingTouch(SeekBar seekBar) {
+        mediaPlayer.pause();
+    }
+
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
+        mediaPlayer.start();
+    }
+
+    @Override
+    public void onCompletion(MediaPlayer mediaPlayer) {
+        try {
+            Log.e("tracksList", tracksList.toString() + currentTrackNumber);
+            Log.e("tracksLayouts", tracksLayouts.toString());
+            LinearLayout trackLayout = tracksList.get(currentTrackNumber++);
+            JSONObject trackData = tracksLayouts.get(trackLayout);
+            if(trackData != null) {
+                setTrack(context, trackData.getInt("id"), trackLayout, trackData);
+            }
+        }catch (JSONException ignored) {}
+    }
+
+    private boolean setTrack(Context context, int trackID, LinearLayout trackLayout, JSONObject trackData){
+        Log.e("context != null", (context != null) + "");
+        if (currentTrack != trackID) {
+            try {
+                currentTrackNumber = tracksList.indexOf(trackLayout);
+                mediaPlayer.stop();
+                CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
+                createMediaPlayerFromURITask.execute(AppAPI.toMP3(trackData.getString("url")));
+                trackLayout.setBackgroundColor(context.getResources().getColor(R.color.track_selected));
+
+                // BCT
+                BCTAuthor.setText(trackData.getString("artist"));
+                BCTName.setText(trackData.getString("title"));
+                currentTrackAuthor.setText(trackData.getString("artist"));
+                currentTrackName.setText(trackData.getString("title"));
+                currentTrackDuration.setText(AppAPI.beautifySeconds(trackData.getInt("duration")));
+                currentTrackSeekBar.setMax(trackData.getInt("duration"));
+
+                BCTPlayBtn.setVisibility(View.GONE);
+                BCTPauseBtn.setVisibility(View.VISIBLE);
+                currentTrackPlayBtn.setVisibility(View.GONE);
+                currentTrackPauseBtn.setVisibility(View.VISIBLE);
+                new SetBCTInfo().execute(trackData);
+
+                currentTrack = trackID;
+                return true;
+            }catch (JSONException ignored){}
+        }
+        return false;
+    }
+
     class LoadingAudio extends AsyncTask<Void, Void, Map<LinearLayout, JSONObject>> {
         @Override
         protected void onPreExecute() {
@@ -214,14 +284,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         if (response.length() > 0) {
                             JSONArray tracks = response.getJSONObject(0).getJSONArray("items");
 
-                            Map<LinearLayout, JSONObject> tracksLayouts = new HashMap<>();
-
                             ImageView trackImage;
                             LinearLayout trackNamesLayout;
                             TextView trackName, trackAuthor, trackDuration;
                             for (int i = 0; i < tracks.length(); i++) {
                                 JSONObject track = tracks.getJSONObject(i);
-                                tracksData.add(track);
 
                                 LinearLayout trackLayout = new LinearLayout(getApplicationContext());
                                 trackLayout.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -278,6 +345,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 trackLayout.addView(trackDuration);
 
                                 tracksLayouts.put(trackLayout, track);
+                                tracksList.add(trackLayout);
                             }
                             return tracksLayouts;
                         }
@@ -293,41 +361,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
 
         @Override
-        protected void onPostExecute(Map<LinearLayout, JSONObject> tracksLayouts) {
+        protected void onPostExecute(Map<LinearLayout, JSONObject> jsonObjectMap) {
             super.onPostExecute(tracksLayouts);
+            MainActivity.tracksLayouts = jsonObjectMap;
+            Log.e("tracksList", tracksList.toString());
+            Log.e("tracksLayouts", tracksLayouts.toString());
             tracksProgressBar.setVisibility(View.GONE);
             if(tracksLayouts != null) {
-                for (Map.Entry<LinearLayout, JSONObject> e : tracksLayouts.entrySet()) {
-                    LinearLayout trackLayout = e.getKey();
-                    JSONObject trackData = e.getValue();
+                for (int i = 0; i < tracksList.size(); i++) {
+                    LinearLayout trackLayout = tracksList.get(i);
+                    JSONObject trackData = tracksLayouts.get(trackLayout);
                     trackLayout.setOnClickListener(new View.OnClickListener() {
                         @Override
                         public void onClick(View view) {
                             try {
                                 int trackID = trackData.getInt("id");
-                                if (currentTrack != trackID) {
-                                    for (LinearLayout t : tracksLayouts.keySet()) {
-                                        t.setBackgroundColor(getResources().getColor(R.color.white));
-                                    }
-                                    CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
-                                    createMediaPlayerFromURITask.execute(AppAPI.toMP3(trackData.getString("url")));
-                                    trackLayout.setBackgroundColor(getResources().getColor(R.color.track_selected));
-
-                                    // BCT
-                                    BCTAuthor.setText(trackData.getString("artist"));
-                                    BCTName.setText(trackData.getString("title"));
-                                    currentTrackAuthor.setText(trackData.getString("artist"));
-                                    currentTrackName.setText(trackData.getString("title"));
-                                    currentTrackDuration.setText(AppAPI.beautifySeconds(trackData.getInt("duration")));
-
-                                    BCTPlayBtn.setVisibility(View.GONE);
-                                    BCTPauseBtn.setVisibility(View.VISIBLE);
-                                    new SetBCTInfo().execute(trackData);
-
-                                    currentTrack = trackID;
-                                }
-                            } catch (JSONException ignored) {
-                            }
+                                setTrack(context, trackID, trackLayout, trackData);
+                            } catch (JSONException ignored) {}
                         }
                     });
                     tracksLayout.addView(trackLayout);
@@ -341,31 +391,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }).show();
             }
         }
+    }
 
-        class CreateMediaPlayerFromURI extends AsyncTask<String, Void, Void> {
-            @Override
-            protected Void doInBackground(String... urls) {
-                try {
-                    mediaPlayer.reset();
-                    mediaPlayer.setDataSource(urls[0]);
+    class CreateMediaPlayerFromURI extends AsyncTask<String, Void, Void> {
+        @Override
+        protected Void doInBackground(String... urls) {
+            try {
+                mediaPlayer.reset();
+                mediaPlayer.setDataSource(urls[0]);
 
-                    mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                        @Override
-                        public void onCompletion(MediaPlayer mp) {
-                            mediaPlayer.stop();
-                            mediaPlayer.reset();
-                        }
-                    });
-                    mediaPlayer.prepare();
-                }catch (IOException ignored){}
-                return null;
-            }
+                mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                    @Override
+                    public void onCompletion(MediaPlayer mp) {
+                        mediaPlayer.stop();
+                        mediaPlayer.reset();
+                    }
+                });
+                mediaPlayer.prepare();
+            }catch (IOException ignored){}
+            return null;
+        }
 
-            @Override
-            protected void onPostExecute(Void unused) {
-                super.onPostExecute(unused);
-                mediaPlayer.start();
-            }
+        @Override
+        protected void onPostExecute(Void unused) {
+            super.onPostExecute(unused);
+            mediaPlayer.start();
+            mediaPlayer.setOnCompletionListener(new MainActivity());
         }
     }
 
@@ -392,6 +443,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 BCTImage.setImageBitmap(bitmap);
                 currentTrackImage.setImageBitmap(bitmap);
             }
+        }
+    }
+
+    class AudioHandlerTask extends AsyncTask<Void, Void, Void> {
+        @Override
+        protected Void doInBackground(Void... voids) {
+            while(isAudioHandlerTaskWork){
+                if(mediaPlayer.isPlaying() && isCurrentTrackLayoutShow){
+                    currentTrackCurrentTime.setText(AppAPI.beautifySeconds(mediaPlayer.getCurrentPosition() / 1000));
+                    currentTrackSeekBar.setProgress(mediaPlayer.getCurrentPosition() / 1000);
+                }
+            }
+            return null;
         }
     }
 }
