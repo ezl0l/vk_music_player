@@ -20,6 +20,8 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -42,23 +44,32 @@ import java.util.Map;
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     AppAPI.Auth authLink;
 
+    ScrollView scrollView;
     Button exitBtn;
-    LinearLayout tracksLayout, bottomCurrentTrackLayout;
+    LinearLayout tracksLayout, bottomCurrentTrackLayout, currentTrackLayout;
     ImageView BCTImage, BCTPlayBtn, BCTPauseBtn, BCTNextBtn;
     TextView BCTName, BCTAuthor;
     ProgressBar tracksProgressBar;
+
+    ImageView currentTrackImage, currentTrackBackBtn, currentTrackPauseBtn, currentTrackPlayBtn, currentTrackNextBtn;
+    TextView currentTrackCurrentTime, currentTrackDuration, currentTrackName, currentTrackAuthor;
+    SeekBar currentTrackSeekBar;
 
     MediaPlayer mediaPlayer = new MediaPlayer();
 
     private int currentTrack = 0;
     ArrayList<JSONObject> tracksData = new ArrayList<>();
 
+    private boolean isCurrentTrackLayoutShow = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        scrollView = findViewById(R.id.scrollView);
         tracksLayout = findViewById(R.id.tracks);
+        currentTrackLayout = findViewById(R.id.currentTrackLayout);
 
         bottomCurrentTrackLayout = findViewById(R.id.bottomCurrentTrack);
         BCTImage = findViewById(R.id.BCTImage);
@@ -69,6 +80,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         BCTAuthor = findViewById(R.id.BCTAuthor);
         exitBtn = findViewById(R.id.exitBtn);
         tracksProgressBar = findViewById(R.id.tracksProgressBar);
+
+        currentTrackImage = findViewById(R.id.currentTrackImage);
+        currentTrackBackBtn = findViewById(R.id.currentTrackBackBtn);
+        currentTrackPauseBtn = findViewById(R.id.currentTrackPauseBtn);
+        currentTrackPlayBtn = findViewById(R.id.currentTrackPlayBtn);
+        currentTrackNextBtn = findViewById(R.id.currentTrackNextBtn);
+        currentTrackCurrentTime = findViewById(R.id.currentTrackCurrentTime);
+        currentTrackDuration = findViewById(R.id.currentTrackDuration);
+        currentTrackName = findViewById(R.id.currentTrackName);
+        currentTrackAuthor = findViewById(R.id.currentTrackAuthor);
+        currentTrackSeekBar = findViewById(R.id.currentTrackSeekBar);
+
+        currentTrackBackBtn.setOnClickListener(this);
+        currentTrackPauseBtn.setOnClickListener(this);
+        currentTrackPlayBtn.setOnClickListener(this);
+        currentTrackNextBtn.setOnClickListener(this);
 
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
         String accessToken = preferences.getString("access_token", "");
@@ -91,6 +118,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         LoadingAudio loadingAudioTask = new LoadingAudio();
         loadingAudioTask.execute();
+    }
+
+    public MediaPlayer getMediaPlayer() {
+        return mediaPlayer;
     }
 
     @Override
@@ -126,6 +157,44 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Snackbar.make(BCTNextBtn, "I can't ;/", Snackbar.LENGTH_SHORT).show();
                 break;
             }
+
+            case R.id.bottomCurrentTrack:{
+                //Intent intent = new Intent(this, BCTActivity.class);
+                //startActivity(intent);
+                scrollView.setVisibility(View.GONE);
+                bottomCurrentTrackLayout.setVisibility(View.GONE);
+                exitBtn.setVisibility(View.GONE);
+                currentTrackLayout.setVisibility(View.VISIBLE);
+                isCurrentTrackLayoutShow = true;
+                break;
+            }
+
+            case R.id.currentTrackPlayBtn:{
+                currentTrackPlayBtn.setVisibility(View.GONE);
+                currentTrackPauseBtn.setVisibility(View.VISIBLE);
+                mediaPlayer.start();
+                break;
+            }
+
+            case R.id.currentTrackPauseBtn:{
+                currentTrackPauseBtn.setVisibility(View.GONE);
+                currentTrackPlayBtn.setVisibility(View.VISIBLE);
+                mediaPlayer.pause();
+                break;
+            }
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if(isCurrentTrackLayoutShow) {
+            currentTrackLayout.setVisibility(View.GONE);
+            scrollView.setVisibility(View.VISIBLE);
+            bottomCurrentTrackLayout.setVisibility(View.VISIBLE);
+            exitBtn.setVisibility(View.VISIBLE);
+            isCurrentTrackLayoutShow = false;
+        }else{
+            super.onBackPressed();
         }
     }
 
@@ -248,6 +317,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                     // BCT
                                     BCTAuthor.setText(trackData.getString("artist"));
                                     BCTName.setText(trackData.getString("title"));
+                                    currentTrackAuthor.setText(trackData.getString("artist"));
+                                    currentTrackName.setText(trackData.getString("title"));
+                                    currentTrackDuration.setText(AppAPI.beautifySeconds(trackData.getInt("duration")));
+
                                     BCTPlayBtn.setVisibility(View.GONE);
                                     BCTPauseBtn.setVisibility(View.VISIBLE);
                                     new SetBCTInfo().execute(trackData);
@@ -318,6 +391,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             super.onPostExecute(bitmap);
             if(bitmap != null){
                 BCTImage.setImageBitmap(bitmap);
+                currentTrackImage.setImageBitmap(bitmap);
             }
         }
     }
