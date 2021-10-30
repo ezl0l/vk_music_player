@@ -40,7 +40,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-//vkAudioLink = new AppAPI.Auth("330155561f0f86218afb51b1fae0ac79b1f87a648deeebb6632b19dcc8b4f83726b426cd141805c399ae4", "a8a41f4d2920819806", true);
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     AppAPI.Auth authLink;
 
