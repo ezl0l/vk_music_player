@@ -228,35 +228,45 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         protected void onPostExecute(Map<LinearLayout, JSONObject> tracksLayouts) {
             super.onPostExecute(tracksLayouts);
             tracksProgressBar.setVisibility(View.GONE);
-            for (Map.Entry<LinearLayout, JSONObject> e: tracksLayouts.entrySet()) {
-                LinearLayout trackLayout = e.getKey();
-                JSONObject trackData = e.getValue();
-                trackLayout.setOnClickListener(new View.OnClickListener() {
+            if(tracksLayouts != null) {
+                for (Map.Entry<LinearLayout, JSONObject> e : tracksLayouts.entrySet()) {
+                    LinearLayout trackLayout = e.getKey();
+                    JSONObject trackData = e.getValue();
+                    trackLayout.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            try {
+                                int trackID = trackData.getInt("id");
+                                if (currentTrack != trackID) {
+                                    for (LinearLayout t : tracksLayouts.keySet()) {
+                                        t.setBackgroundColor(getResources().getColor(R.color.white));
+                                    }
+                                    CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
+                                    createMediaPlayerFromURITask.execute(AppAPI.toMP3(trackData.getString("url")));
+                                    trackLayout.setBackgroundColor(getResources().getColor(R.color.track_selected));
+
+                                    // BCT
+                                    BCTAuthor.setText(trackData.getString("artist"));
+                                    BCTName.setText(trackData.getString("title"));
+                                    BCTPlayBtn.setVisibility(View.GONE);
+                                    BCTPauseBtn.setVisibility(View.VISIBLE);
+                                    new SetBCTInfo().execute(trackData);
+
+                                    currentTrack = trackID;
+                                }
+                            } catch (JSONException ignored) {
+                            }
+                        }
+                    });
+                    tracksLayout.addView(trackLayout);
+                }
+            }else{
+                Snackbar.make(tracksLayout, R.string.failed_audio_loading, Snackbar.LENGTH_LONG).setAction(R.string.try_again, new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
-                        try {
-                            int trackID = trackData.getInt("id");
-                            if(currentTrack != trackID) {
-                                for(LinearLayout t : tracksLayouts.keySet()) {
-                                    t.setBackgroundColor(getResources().getColor(R.color.white));
-                                }
-                                CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
-                                createMediaPlayerFromURITask.execute(AppAPI.toMP3(trackData.getString("url")));
-                                trackLayout.setBackgroundColor(getResources().getColor(R.color.track_selected));
-
-                                // BCT
-                                BCTAuthor.setText(trackData.getString("artist"));
-                                BCTName.setText(trackData.getString("title"));
-                                BCTPlayBtn.setVisibility(View.GONE);
-                                BCTPauseBtn.setVisibility(View.VISIBLE);
-                                new SetBCTInfo().execute(trackData);
-
-                                currentTrack = trackID;
-                            }
-                        } catch (JSONException ignored) {}
+                        new LoadingAudio().execute();
                     }
-                });
-                tracksLayout.addView(trackLayout);
+                }).show();
             }
         }
 
