@@ -7,6 +7,7 @@
     tools:context=".LoginActivity">
 
     <LinearLayout
+        android:id="@+id/loginLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="1dp"
@@ -34,7 +35,7 @@
             android:layout_marginRight="30dp"
             android:ems="10"
             android:inputType="textPersonName"
-            android:minHeight="48dp"/>
+            android:minHeight="48dp" />
 
         <EditText
             android:id="@+id/passwordEditText"
@@ -44,7 +45,7 @@
             android:layout_marginRight="30dp"
             android:ems="10"
             android:inputType="textPassword"
-            android:minHeight="48dp"/>
+            android:minHeight="48dp" />
 
         <Button
             android:id="@+id/signIn"
@@ -53,5 +54,42 @@
             android:layout_marginTop="10dp"
             android:text="@string/sign_in" />
 
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/validationLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="100dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/need_validation"
+            android:textSize="24sp" />
+
+        <EditText
+            android:id="@+id/validationCodeEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="30dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginRight="30dp"
+            android:ems="10"
+            android:hint="@string/code"
+            android:inputType="textPersonName"
+            android:minHeight="48dp" />
+
+        <Button
+            android:id="@+id/validateBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/sign_in" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -5,4 +5,7 @@
     <string name="exit">Exit</string>
     <string name="invalid_credentials">Invalid username or password</string>
     <string name="failed_audio_loading">Error loading audio</string>
+    <string name="need_validation">Need validation</string>
+    <string name="code">Code</string>
+    <string name="invalid_validation_code">Invalid validation code</string>
 </resources>

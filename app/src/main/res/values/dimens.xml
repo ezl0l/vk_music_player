@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="trackImageWidth">50dp</dimen>
+    <dimen name="trackImageHeight">50dp</dimen>
+    <dimen name="trackLayoutLeftPadding">10dp</dimen>
+    <dimen name="trackLayoutRightPadding">5dp</dimen>
+    <dimen name="trackLayoutTopPadding">5dp</dimen>
+    <dimen name="trackLayoutBottomPadding">5dp</dimen>
+    <dimen name="trackNameAndAuthorLeftMargin">10dp</dimen>
+    <dimen name="trackNameAndAuthorRightMargin">0dp</dimen>
+    <dimen name="trackNameAndAuthorTopMargin">0dp</dimen>
+    <dimen name="trackNameAndAuthorBottomMargin">0dp</dimen>
+</resources>
