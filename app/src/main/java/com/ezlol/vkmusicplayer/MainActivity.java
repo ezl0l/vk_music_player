@@ -12,7 +12,6 @@ import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.provider.MediaStore;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
@@ -37,12 +36,14 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener, SeekBar.OnSeekBarChangeListener, MediaPlayer.OnCompletionListener {
-    private Context context;
+    static String TRACK_ALBUM_PHOTO_QUALITY = "photo_135";
+
     AppAPI.Auth authLink;
 
     ScrollView scrollView;
@@ -61,6 +62,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private int currentTrack = 0, currentTrackNumber = 0;
     static List<LinearLayout> tracksList = new ArrayList<>();
     static Map<LinearLayout, JSONObject> tracksLayouts = new HashMap<>();
+    static Map<Integer, Bitmap> tracksAlbums = new HashMap<>();
 
     private boolean isCurrentTrackLayoutShow = false;
     private boolean isAudioHandlerTaskWork = true;
@@ -69,8 +71,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        context = this;
 
         scrollView = findViewById(R.id.scrollView);
         tracksLayout = findViewById(R.id.tracks);
@@ -121,6 +121,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         BCTNextBtn.setOnClickListener(this);
         bottomCurrentTrackLayout.setOnClickListener(this);
         currentTrackSeekBar.setOnSeekBarChangeListener(this);
+
+        mediaPlayer.setOnBufferingUpdateListener(new MediaPlayer.OnBufferingUpdateListener() {
+            @Override
+            public void onBufferingUpdate(MediaPlayer mediaPlayer, int i) {
+                currentTrackSeekBar.setSecondaryProgress(i);
+            }
+        });
 
         LoadingAudio loadingAudioTask = new LoadingAudio();
         loadingAudioTask.execute();
@@ -225,46 +232,53 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     public void onCompletion(MediaPlayer mediaPlayer) {
-        try {
-            Log.e("tracksList", tracksList.toString() + currentTrackNumber);
-            Log.e("tracksLayouts", tracksLayouts.toString());
-            LinearLayout trackLayout = tracksList.get(currentTrackNumber++);
-            JSONObject trackData = tracksLayouts.get(trackLayout);
-            if(trackData != null) {
-                setTrack(context, trackData.getInt("id"), trackLayout, trackData);
-            }
-        }catch (JSONException ignored) {}
+
     }
 
-    private boolean setTrack(Context context, int trackID, LinearLayout trackLayout, JSONObject trackData){
-        Log.e("context != null", (context != null) + "");
-        if (currentTrack != trackID) {
-            try {
-                currentTrackNumber = tracksList.indexOf(trackLayout);
-                mediaPlayer.stop();
-                CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
-                createMediaPlayerFromURITask.execute(AppAPI.toMP3(trackData.getString("url")));
-                trackLayout.setBackgroundColor(context.getResources().getColor(R.color.track_selected));
-
-                // BCT
-                BCTAuthor.setText(trackData.getString("artist"));
-                BCTName.setText(trackData.getString("title"));
-                currentTrackAuthor.setText(trackData.getString("artist"));
-                currentTrackName.setText(trackData.getString("title"));
-                currentTrackDuration.setText(AppAPI.beautifySeconds(trackData.getInt("duration")));
-                currentTrackSeekBar.setMax(trackData.getInt("duration"));
-
-                BCTPlayBtn.setVisibility(View.GONE);
-                BCTPauseBtn.setVisibility(View.VISIBLE);
-                currentTrackPlayBtn.setVisibility(View.GONE);
-                currentTrackPauseBtn.setVisibility(View.VISIBLE);
-                new SetBCTInfo().execute(trackData);
-
-                currentTrack = trackID;
-                return true;
-            }catch (JSONException ignored){}
+    private void unselectAllTracks(){
+        for(int i = 0; i < tracksList.size(); i++){
+            tracksList.get(i).setBackgroundResource(R.color.track_unselected);
         }
-        return false;
+    }
+
+    public void setTrack(int trackNum){
+        try {
+            LinearLayout trackLayout = tracksList.get(trackNum);
+            JSONObject trackData = tracksLayouts.get(trackLayout);
+
+            unselectAllTracks();
+
+            currentTrackNumber = trackNum;
+
+            BCTImage.setImageResource(R.drawable.ic_default_track_album);
+
+            synchronized (this) {
+                if(tracksAlbums.containsKey(trackData.getInt("id"))){
+                    BCTImage.setImageBitmap(tracksAlbums.get(trackData.getInt("id")));
+                }else {
+                    CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
+                    createMediaPlayerFromURITask.execute(AppAPI.toMP3(trackData.getString("url")));
+                }
+                new SetBCTInfo().execute(trackData);
+            }
+
+            trackLayout.setBackgroundResource(R.color.track_selected);
+            // BCT
+            BCTAuthor.setText(trackData.getString("artist"));
+            BCTName.setText(trackData.getString("title"));
+            currentTrackAuthor.setText(trackData.getString("artist"));
+            currentTrackName.setText(trackData.getString("title"));
+            currentTrackDuration.setText(AppAPI.beautifySeconds(trackData.getInt("duration")));
+            currentTrackSeekBar.setMax(trackData.getInt("duration"));
+
+            BCTPlayBtn.setVisibility(View.GONE);
+            BCTPauseBtn.setVisibility(View.VISIBLE);
+            currentTrackPlayBtn.setVisibility(View.GONE);
+            currentTrackPauseBtn.setVisibility(View.VISIBLE);
+            currentTrack = trackData.getInt("id");
+        }catch (JSONException ignored){
+            Log.e("setTrack", "json error");
+        }
     }
 
     class LoadingAudio extends AsyncTask<Void, Void, Map<LinearLayout, JSONObject>> {
@@ -272,11 +286,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         protected void onPreExecute() {
             super.onPreExecute();
             tracksProgressBar.setVisibility(View.VISIBLE);
+            tracksLayouts.clear();
+            tracksList.clear();
         }
 
         @Override
         protected Map<LinearLayout, JSONObject> doInBackground(Void... voids) {
             JSONObject jsonObject = authLink.getAudios();
+            Log.i("AUDIO:", jsonObject.toString());
             if(jsonObject != null){
                 if(jsonObject.has("response")) {
                     try {
@@ -302,16 +319,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 trackImage.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
                                 trackImage.getLayoutParams().height = (int) getResources().getDimension(R.dimen.trackImageHeight);
                                 trackImage.getLayoutParams().width = (int) getResources().getDimension(R.dimen.trackImageWidth);
-                                try {
-                                    URL urlConnection = new URL(track.getJSONObject("album").getJSONObject("thumb").getString("photo_135"));
-                                    HttpURLConnection connection = (HttpURLConnection) urlConnection
-                                            .openConnection();
-                                    connection.setDoInput(true);
-                                    connection.connect();
-                                    InputStream input = connection.getInputStream();
-                                    Bitmap bitmap = BitmapFactory.decodeStream(input);
+
+                                trackImage.setImageResource(R.drawable.ic_default_track_album);
+
+                                Bitmap bitmap = null;
+                                if(tracksAlbums.containsKey(track.getInt("id"))){
+                                    bitmap = tracksAlbums.get(track.getInt("id"));
+                                }else {
+                                    try {
+                                        URL urlConnection = new URL(track.getJSONObject("album").getJSONObject("thumb").getString(TRACK_ALBUM_PHOTO_QUALITY));
+                                        HttpURLConnection connection = (HttpURLConnection) urlConnection
+                                                .openConnection();
+                                        connection.setDoInput(true);
+                                        connection.connect();
+                                        InputStream input = connection.getInputStream();
+                                        bitmap = BitmapFactory.decodeStream(input);
+                                        tracksAlbums.put(track.getInt("id"), bitmap);
+                                    } catch (IOException | JSONException ignored) {
+                                        Log.e("Album loading error", track.toString());
+                                    }
+                                }
+                                if(bitmap != null)
                                     trackImage.setImageBitmap(bitmap);
-                                } catch (IOException ignored){}
 
                                 trackNamesLayout = new LinearLayout(getApplicationContext());
                                 trackNamesLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -368,6 +397,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             Log.e("tracksLayouts", tracksLayouts.toString());
             tracksProgressBar.setVisibility(View.GONE);
             if(tracksLayouts != null) {
+                synchronized (tracksLayout) {
+                    tracksLayout.removeAllViews();
+                }
                 for (int i = 0; i < tracksList.size(); i++) {
                     LinearLayout trackLayout = tracksList.get(i);
                     JSONObject trackData = tracksLayouts.get(trackLayout);
@@ -376,12 +408,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         public void onClick(View view) {
                             try {
                                 int trackID = trackData.getInt("id");
-                                setTrack(context, trackID, trackLayout, trackData);
+                                setTrack(tracksList.indexOf(trackLayout));
                             } catch (JSONException ignored) {}
                         }
                     });
+                    if(trackLayout.getParent() != null)
+                        ((ViewGroup) trackLayout.getParent()).removeView(trackLayout);
                     tracksLayout.addView(trackLayout);
                 }
+                new TrackAlbumLoading().execute();
             }else{
                 Snackbar.make(tracksLayout, R.string.failed_audio_loading, Snackbar.LENGTH_LONG).setAction(R.string.try_again, new View.OnClickListener() {
                     @Override
@@ -397,16 +432,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         protected Void doInBackground(String... urls) {
             try {
+                mediaPlayer.stop();
+                Log.e("STOP AND RESET", "MEDIA PLAYER");
                 mediaPlayer.reset();
+                mediaPlayer = new MediaPlayer();
                 mediaPlayer.setDataSource(urls[0]);
 
-                mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                /*mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                     @Override
                     public void onCompletion(MediaPlayer mp) {
                         mediaPlayer.stop();
                         mediaPlayer.reset();
                     }
-                });
+                });*/
                 mediaPlayer.prepare();
             }catch (IOException ignored){}
             return null;
@@ -416,7 +454,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         protected void onPostExecute(Void unused) {
             super.onPostExecute(unused);
             mediaPlayer.start();
-            mediaPlayer.setOnCompletionListener(new MainActivity());
+            mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer mediaPlayer) {
+                    currentTrackSeekBar.setProgress(0);
+                    Log.e("tracksList", tracksList.toString() + currentTrackNumber);
+                    Log.e("tracksLayouts", tracksLayouts.toString());
+                    Log.e("SETTRACK", currentTrackNumber + "");
+                    setTrack(currentTrackNumber++);
+                }
+            });
         }
     }
 
@@ -456,6 +503,34 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             }
             return null;
+        }
+    }
+
+    class TrackAlbumLoading extends AsyncTask<Void, Void, Void> {
+        @Override
+        protected Void doInBackground(Void... voids) {
+            for(JSONObject track : tracksLayouts.values()){
+                try {
+                    int trackID = track.getInt("id");
+                    if(!tracksAlbums.containsKey(trackID)) {
+                        URL urlConnection = new URL(track.getJSONObject("album").getJSONObject("thumb").getString(TRACK_ALBUM_PHOTO_QUALITY));
+                        HttpURLConnection connection = (HttpURLConnection) urlConnection
+                                .openConnection();
+                        connection.setDoInput(true);
+                        connection.connect();
+                        InputStream input = connection.getInputStream();
+                        Bitmap b = BitmapFactory.decodeStream(input);
+                        tracksAlbums.put(trackID, b);
+                        Log.i("TrackAlbumLoader", "Loaded track album with ID " + trackID);
+                    }
+                }catch (IOException | JSONException ignored){}
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void unused) {
+            super.onPostExecute(unused);
         }
     }
 }

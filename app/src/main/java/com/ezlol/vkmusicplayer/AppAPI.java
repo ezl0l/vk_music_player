@@ -228,7 +228,7 @@ public class AppAPI {
         }
 
         public JSONObject getAudios(){
-            return getAudios(20);
+            return getAudios(100);
         }
 
         private static String bytesToHex(byte[] bytes) {

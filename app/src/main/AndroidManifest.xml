@@ -12,9 +12,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.VKMusicPlayer">
         <activity
-            android:name=".BCTActivity"
-            android:exported="true" />
-        <activity
             android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
