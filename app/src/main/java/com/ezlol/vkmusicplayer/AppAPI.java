@@ -149,7 +149,6 @@ public class AppAPI {
         public boolean validate(String code, String username, String password, boolean forceSMS) throws AuthException {
             Response r = session.get(String.format("https://oauth.vk.com/token?grant_type=password&scope=nohttps,audio&client_id=2274003&client_secret=hHbZxrka2uZ6jB1inYsH&username=%s&password=%s&v=5.131&2fa_supported=1&code=%s&force_sms=", username, password, code, forceSMS ? "1" : "0"), HEADERS);
             if(r != null){
-                Log.e("RESPONSE 0", r.toString());
                 JSONObject response = r.json();
                 if(!response.has("error")){
                     try {
@@ -164,6 +163,8 @@ public class AppAPI {
                     } catch (JSONException ignored) {
                         throw new AuthException("Invalid username or password");
                     }
+                }else{
+                    Log.e("AppAPI", "Validation error: " + r);
                 }
             }
             return false;
@@ -190,17 +191,14 @@ public class AppAPI {
             for (Map.Entry<String, String> e : params.entrySet()) {
                 url += "&" + e.getKey() + "=" + e.getValue();
             }
-            Log.e("URL in formRequest", url);
             return url;
         }
 
         public JSONObject send(String url, Map<String, String> params){
-            Log.e("URL in send", url);
             String hash;
             try {
                 MessageDigest md = MessageDigest.getInstance("MD5");
                 String toHash = (url + this.secret);
-                Log.e("TOHASH", toHash);
                 md.update(toHash.getBytes());
                 hash = bytesToHex(md.digest());
             } catch (NoSuchAlgorithmException ignored) {
@@ -213,7 +211,6 @@ public class AppAPI {
             }
 
             String allURL = "https://api.vk.com" + url + "&sig=" + hash;
-            Log.e("allURL in send 2", allURL);
             Response r = session.get(allURL, HEADERS);
             if(r != null){
                 return r.json();

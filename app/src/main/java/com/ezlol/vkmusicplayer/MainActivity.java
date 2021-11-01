@@ -152,28 +152,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 return; // ХЗ, надо ли раз есть finish(), но на всякий случай
             }
 
-            case R.id.BCTPauseBtn:{
-                BCTPauseBtn.setVisibility(View.GONE);
-                BCTPlayBtn.setVisibility(View.VISIBLE);
-                mediaPlayer.pause();
-                break;
-            }
-
-            case R.id.BCTPlayBtn:{
-                BCTPlayBtn.setVisibility(View.GONE);
-                BCTPauseBtn.setVisibility(View.VISIBLE);
-                mediaPlayer.start();
-                break;
-            }
-
-            case R.id.BCTNextBtn:{
-                Snackbar.make(BCTNextBtn, "I can't ;/", Snackbar.LENGTH_SHORT).show();
-                break;
-            }
-
             case R.id.bottomCurrentTrack:{
-                //Intent intent = new Intent(this, BCTActivity.class);
-                //startActivity(intent);
                 scrollView.setVisibility(View.GONE);
                 bottomCurrentTrackLayout.setVisibility(View.GONE);
                 exitBtn.setVisibility(View.GONE);
@@ -183,19 +162,49 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 break;
             }
 
+            case R.id.BCTPlayBtn:
             case R.id.currentTrackPlayBtn:{
-                currentTrackPlayBtn.setVisibility(View.GONE);
-                currentTrackPauseBtn.setVisibility(View.VISIBLE);
-                mediaPlayer.start();
+                resumeTrack();
                 break;
             }
 
+            case R.id.BCTPauseBtn:
             case R.id.currentTrackPauseBtn:{
-                currentTrackPauseBtn.setVisibility(View.GONE);
-                currentTrackPlayBtn.setVisibility(View.VISIBLE);
-                mediaPlayer.pause();
+                pauseTrack();
                 break;
             }
+
+            case R.id.BCTNextBtn:
+            case R.id.currentTrackNextBtn:{
+                setTrack(++currentTrackNumber);
+                break;
+            }
+
+            case R.id.currentTrackBackBtn:{
+                setTrack(--currentTrackNumber);
+                break;
+            }
+        }
+    }
+
+    private void pauseTrack() {
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            mediaPlayer.pause();
+            //unselectAllTracks();
+            currentTrackPauseBtn.setVisibility(View.GONE);
+            currentTrackPlayBtn.setVisibility(View.VISIBLE);
+            BCTPauseBtn.setVisibility(View.GONE);
+            BCTPlayBtn.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void resumeTrack() {
+        if (mediaPlayer != null) {
+            mediaPlayer.start();
+            currentTrackPlayBtn.setVisibility(View.GONE);
+            currentTrackPauseBtn.setVisibility(View.VISIBLE);
+            BCTPlayBtn.setVisibility(View.GONE);
+            BCTPauseBtn.setVisibility(View.VISIBLE);
         }
     }
 
@@ -243,6 +252,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public void setTrack(int trackNum){
         try {
+            Log.i("setTrackNumber", trackNum + "");
             LinearLayout trackLayout = tracksList.get(trackNum);
             JSONObject trackData = tracksLayouts.get(trackLayout);
 
@@ -255,15 +265,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             synchronized (this) {
                 if(tracksAlbums.containsKey(trackData.getInt("id"))){
                     BCTImage.setImageBitmap(tracksAlbums.get(trackData.getInt("id")));
-                }else {
-                    CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
-                    createMediaPlayerFromURITask.execute(AppAPI.toMP3(trackData.getString("url")));
                 }
+                CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
+                createMediaPlayerFromURITask.execute(AppAPI.toMP3(trackData.getString("url")));
                 new SetBCTInfo().execute(trackData);
             }
 
             trackLayout.setBackgroundResource(R.color.track_selected);
             // BCT
+            bottomCurrentTrackLayout.setVisibility(View.VISIBLE);
             BCTAuthor.setText(trackData.getString("artist"));
             BCTName.setText(trackData.getString("title"));
             currentTrackAuthor.setText(trackData.getString("artist"));
@@ -276,8 +286,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             currentTrackPlayBtn.setVisibility(View.GONE);
             currentTrackPauseBtn.setVisibility(View.VISIBLE);
             currentTrack = trackData.getInt("id");
-        }catch (JSONException ignored){
-            Log.e("setTrack", "json error");
+        }catch (Exception e){
+            int s = Log.e("setTrack", "any error:" + e.toString());
         }
     }
 
@@ -402,14 +412,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 for (int i = 0; i < tracksList.size(); i++) {
                     LinearLayout trackLayout = tracksList.get(i);
-                    JSONObject trackData = tracksLayouts.get(trackLayout);
+                    //JSONObject trackData = tracksLayouts.get(trackLayout);
                     trackLayout.setOnClickListener(new View.OnClickListener() {
                         @Override
                         public void onClick(View view) {
                             try {
-                                int trackID = trackData.getInt("id");
                                 setTrack(tracksList.indexOf(trackLayout));
-                            } catch (JSONException ignored) {}
+                            } catch (Exception e) {
+                                Log.e("track onClick error", e.toString());
+                            }
                         }
                     });
                     if(trackLayout.getParent() != null)
@@ -430,23 +441,35 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     class CreateMediaPlayerFromURI extends AsyncTask<String, Void, Void> {
         @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            isAudioHandlerTaskWork = false;
+            if(mediaPlayer != null) {
+                Log.i("CreateMediaPlayer", "STOP AND RELease");
+                mediaPlayer.stop();
+                mediaPlayer.release();
+            }
+            Log.i("CreateMediaPlayer", "Created new");
+            mediaPlayer = new MediaPlayer();
+        }
+
+        @Override
         protected Void doInBackground(String... urls) {
             try {
-                mediaPlayer.stop();
-                Log.e("STOP AND RESET", "MEDIA PLAYER");
-                mediaPlayer.reset();
-                mediaPlayer = new MediaPlayer();
                 mediaPlayer.setDataSource(urls[0]);
 
-                /*mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                     @Override
                     public void onCompletion(MediaPlayer mp) {
-                        mediaPlayer.stop();
-                        mediaPlayer.reset();
+                        //mediaPlayer.stop();
+                        Log.i("CreateMediaPlayer", "CMP onCompletion");
+                        //mediaPlayer.reset();
                     }
-                });*/
+                });
                 mediaPlayer.prepare();
-            }catch (IOException ignored){}
+            }catch (IOException e){
+                Log.e("CreateMediaPlayer", e.toString());
+            }
             return null;
         }
 
@@ -454,6 +477,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         protected void onPostExecute(Void unused) {
             super.onPostExecute(unused);
             mediaPlayer.start();
+
+            isAudioHandlerTaskWork = true;
+            new AudioHandlerTask().execute();
+
             mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer mediaPlayer) {
@@ -461,7 +488,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     Log.e("tracksList", tracksList.toString() + currentTrackNumber);
                     Log.e("tracksLayouts", tracksLayouts.toString());
                     Log.e("SETTRACK", currentTrackNumber + "");
-                    setTrack(currentTrackNumber++);
+                    setTrack(++currentTrackNumber);
                 }
             });
         }
@@ -497,7 +524,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         protected Void doInBackground(Void... voids) {
             while(isAudioHandlerTaskWork){
-                if(mediaPlayer.isPlaying() && isCurrentTrackLayoutShow){
+                if(mediaPlayer != null
+                        && mediaPlayer.isPlaying()
+                        && isCurrentTrackLayoutShow){
                     currentTrackCurrentTime.setText(AppAPI.beautifySeconds(mediaPlayer.getCurrentPosition() / 1000));
                     currentTrackSeekBar.setProgress(mediaPlayer.getCurrentPosition() / 1000);
                 }
@@ -531,6 +560,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         protected void onPostExecute(Void unused) {
             super.onPostExecute(unused);
+            Log.i("TrackAlbumLoader", "All albums have been loaded.");
         }
     }
 }
