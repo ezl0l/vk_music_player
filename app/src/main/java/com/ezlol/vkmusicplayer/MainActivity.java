@@ -1,7 +1,11 @@
 package com.ezlol.vkmusicplayer;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -58,6 +62,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     SeekBar currentTrackSeekBar;
 
     MediaPlayer mediaPlayer = new MediaPlayer();
+    NotificationManager notificationManager;
 
     private int currentTrack = 0, currentTrackNumber = 0;
     static List<LinearLayout> tracksList = new ArrayList<>();
@@ -139,6 +144,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     public void onClick(View v) {
+        // Notification Test
+        NotificationCompat.Builder n = new NotificationCompat.Builder(this, "VK Music Player")
+                .setSmallIcon(R.drawable.ic_default_track_album)
+                .setContentTitle("Test notification")
+                .setContentText("MediaPlayer")
+                .setSubText("134")
+                .setAutoCancel(true);
+        NotificationManagerCompat a = NotificationManagerCompat.from(this);
+        a.notify(101, n.build());
+
+        Log.e("NotificationManager", a.areNotificationsEnabled() + "");
         switch (v.getId()) {
             case R.id.exitBtn: {
                 PreferenceManager.getDefaultSharedPreferences(this).edit()
@@ -456,17 +472,25 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         protected Void doInBackground(String... urls) {
             try {
-                mediaPlayer.setDataSource(urls[0]);
+                synchronized (mediaPlayer) {
+                    try {
+                        mediaPlayer.setDataSource(urls[0]);
 
-                mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                    @Override
-                    public void onCompletion(MediaPlayer mp) {
-                        //mediaPlayer.stop();
-                        Log.i("CreateMediaPlayer", "CMP onCompletion");
-                        //mediaPlayer.reset();
+                        mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                            @Override
+                            public void onCompletion(MediaPlayer mp) {
+                                //mediaPlayer.stop();
+                                Log.i("CreateMediaPlayer", "CMP onCompletion");
+                                //mediaPlayer.reset();
+                            }
+                        });
+
+                        mediaPlayer.prepare();
+                    } catch (IllegalStateException e) {
+                        Log.e("CreateMediaPlayer", "Error while setDataSource or prepare audio: " + e.toString());
+                        Log.i("CreateMediaPlayer", "currentTrack: " + currentTrack);
                     }
-                });
-                mediaPlayer.prepare();
+                }
             }catch (IOException e){
                 Log.e("CreateMediaPlayer", e.toString());
             }
