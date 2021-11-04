@@ -63,16 +63,25 @@ public class AppAPI {
 
     public static String toMP3(String url){
         Log.e("STRING URL", url);
-        Pattern p = Pattern.compile("/[a-zA-Z\\d]{6,}(/.*?[a-zA-Z\\d]+?)/index\\.m3u8()");
-        Matcher m = p.matcher(url);
-        m.find();
-        Log.e("MATCHES", m.groupCount() + "-");
-        if(m.groupCount() == 2) {
-            Log.e("GROUP 0", m.group(0) + " - 0");
-            Log.e("GROUP 1", m.group(1) + " - 1");
-            return m.replaceFirst("$1$2.mp3");
-        }
-        return null;
+        Log.e("STRING URL", newToMP3(url));
+        try {
+            Pattern p = Pattern.compile("/[a-zA-Z\\d]{6,}(/.*?[a-zA-Z\\d]+?)/index\\.m3u8()");
+            Matcher m = p.matcher(url);
+            if (m.find() && m.groupCount() == 2) {
+                return m.replaceFirst("$1$2.mp3");
+            }
+        }catch (Exception ignored){}
+        return url;
+    }
+
+    public static String newToMP3(String url){
+        // Not a m3u8 url
+        if (!url.contains("index.m3u8"))
+            return url;
+        if (url.contains("/audios/"))
+            return url.replaceFirst("^(.+?)/[^/]+?/audios/([^/]+)/.+$", "$1/audios/$2.mp3");
+        else
+            return url.replaceFirst("^(.+?)/(p[0-9]+)/[^/]+?/([^/]+)/.+$", "$1/$2/$3.mp3");
     }
 
     public static class Auth {
