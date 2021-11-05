@@ -13,4 +13,7 @@
     <string name="save">Save</string>
     <string name="track_saved">Track has been saved!</string>
     <string name="cant_convert_m3u8_to_mp3">This track cannot be downloaded or cached.</string>
+    <string name="delete">Delete</string>
+    <string name="deleted">Deleted!</string>
+    <string name="error">Error</string>
 </resources>

@@ -1,12 +1,18 @@
 package com.ezlol.vkmusicplayer;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 
+import android.annotation.SuppressLint;
+import android.app.AlertDialog;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -24,6 +30,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.Filter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -32,6 +39,8 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.internal.NavigationMenu;
+import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.Snackbar;
 
 import org.json.JSONArray;
@@ -51,7 +60,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity implements View.OnClickListener, SeekBar.OnSeekBarChangeListener, MediaPlayer.OnCompletionListener {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener,
+        SeekBar.OnSeekBarChangeListener,
+        MediaPlayer.OnCompletionListener,
+        NavigationView.OnNavigationItemSelectedListener {
     static String TRACK_ALBUM_PHOTO_QUALITY = "photo_135";
 
     AppAPI.Auth authLink;
@@ -116,6 +128,46 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         currentTrackPlayBtn.setOnClickListener(this);
         currentTrackNextBtn.setOnClickListener(this);
 
+        findViewById(R.id.deleteCache).setOnClickListener(new View.OnClickListener() {
+            private boolean deleteDir(File dir) {
+                if (dir != null && dir.isDirectory()) {
+                    String[] children = dir.list();
+                    for (int i = 0; i < children.length; i++) {
+                        boolean success = deleteDir(new File(dir, children[i]));
+                        if (!success) {
+                            return false;
+                        }
+                    }
+                    return dir.delete();
+                } else if(dir!= null && dir.isFile()) {
+                    return dir.delete();
+                } else {
+                    return false;
+                }
+            }
+
+            @Override
+            public void onClick(View view) {
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Are u sure?")
+                        .setMessage("You really want delete ALL cache?")
+                        .setPositiveButton(android.R.string.yes, (dialogInterface, i) -> {
+                            File cacheDir = getCacheDir();
+                            if(cacheDir != null) {
+                                if(deleteDir(cacheDir))
+                                    Toast.makeText(MainActivity.this, "Deleted!", Toast.LENGTH_SHORT).show();
+                                else
+                                    Toast.makeText(MainActivity.this, "Error!", Toast.LENGTH_SHORT).show();
+                            }else{
+                                Toast.makeText(MainActivity.this, "Cache dir == null!", Toast.LENGTH_SHORT).show();
+                            }
+                        })
+                        .setNegativeButton(android.R.string.no, null)
+                        .setIcon(android.R.drawable.ic_dialog_alert)
+                        .show();
+            }
+        });
+
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
         String accessToken = preferences.getString("access_token", "");
         String secret = preferences.getString("secret", "");
@@ -166,6 +218,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         LoadingAudio loadingAudioTask = new LoadingAudio();
         loadingAudioTask.execute();
 
+        //Nav
+        /*DrawerLayout drawer = findViewById(R.id.drawer_layout);
+        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+                this, null, null, R.string.app_name, R.string.exit);
+        //drawer.setDrawerListener(toggle);
+        drawer.addDrawerListener(toggle);
+        toggle.syncState();
+
+        NavigationView navigationView = findViewById(R.id.nav_view);
+        navigationView.setNavigationItemSelectedListener(this);*/
+
         getSupportActionBar().hide();
 
         /*Toast.makeText(this, getCacheDir().toString(), Toast.LENGTH_LONG).show();
@@ -178,6 +241,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
+    public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+        return false;
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.track_menu, menu);
         return true;
@@ -187,8 +255,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch(item.getItemId()){
             case R.id.action_save:{
-                Log.i("TrackCachingMachine", "" + currentTrack);
                 saveTrack(currentTrack);
+                break;
+            }
+
+            case R.id.action_delete:{
+                if(deleteTrack(currentTrack))
+                    Toast.makeText(this, R.string.deleted, Toast.LENGTH_SHORT).show();
+                else
+                    Toast.makeText(this, R.string.error, Toast.LENGTH_SHORT).show();
                 break;
             }
         }
@@ -197,7 +272,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private void saveTrack(int trackID, String trackURL){
         Log.i("saveTrack", "trackID: " + trackID + " trackURL: " + trackURL);
-        new TrackCachingMachine().execute(String.valueOf(trackID), trackURL);
+        String trackRealURL = AppAPI.newToMP3(trackURL);
+        if(trackRealURL.equals(trackURL)){
+            Toast.makeText(this, R.string.error_download_track, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new TrackCachingMachine().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, String.valueOf(trackID), trackRealURL);
     }
 
     private void saveTrack(int trackID){
@@ -223,8 +303,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         Log.i("saveTrack", "success: false");
     }
 
-    public MediaPlayer getMediaPlayer() {
-        return mediaPlayer;
+    private boolean deleteTrack(int trackID){
+        File trackFile = new File(getCacheDir(), String.format("%d.music", trackID));
+        if(trackFile.exists())
+            return trackFile.delete();
+        return false;
     }
 
     @Override
@@ -315,6 +398,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
+    protected void onStop() {
+        super.onStop();
+        isCurrentTrackLayoutShow = false;
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        isCurrentTrackLayoutShow = true;
+    }
+
+    @Override
     public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
         if(b){
             mediaPlayer.seekTo(i * 1000);
@@ -353,10 +448,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             if (trackData != null) {
                 NotificationCompat.Builder n = new NotificationCompat.Builder(this, CHANNEL_ID)
                         .setSmallIcon(R.drawable.ic_default_track_album)
-                        .setContentTitle(CHANNEL_ID)
-                        .setContentText(trackData.getString("title"))
-                        .setSubText(trackData.getString("artist"))
-                        .setAutoCancel(false);
+                        .setContentTitle(trackData.getString("title"))
+                        .setContentText(trackData.getString("artist"))
+                        .setSubText(CHANNEL_ID)
+                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                        .setOngoing(true)
+                        .setAutoCancel(true);
                 NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(this);
                 notificationManagerCompat.notify(NOTIFICATION_ID, n.build());
                 currentTrack = trackData.getInt("id");
@@ -372,6 +469,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 File trackFile = new File(getCacheDir(), String.format("%d.music", trackData.getInt("id")));
                 if(trackFile.exists()){
+                    Log.i("setTrack", "Take a track from cache.");
                     new CreateMediaPlayerFromFile().execute(trackFile.getAbsolutePath());
                 }else {
                     CreateMediaPlayerFromURI createMediaPlayerFromURITask = new CreateMediaPlayerFromURI();
@@ -413,14 +511,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         protected void onPreExecute() {
             super.onPreExecute();
             tracksProgressBar.setVisibility(View.VISIBLE);
-            tracksLayouts.clear();
-            tracksList.clear();
+            if(tracksLayouts != null)
+                tracksLayouts.clear();
+            if(tracksList != null)
+                tracksList.clear();
         }
 
         @Override
         protected Map<LinearLayout, JSONObject> doInBackground(Void... voids) {
             JSONObject jsonObject = authLink.getAudios();
-            Log.i("AUDIO:", jsonObject.toString());
             if(jsonObject != null){
                 if(jsonObject.has("response")) {
                     try {
@@ -510,8 +609,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
                 }
             }else{
-                Log.e("ERROR", "!23");
-                Snackbar.make(tracksLayout, R.string.failed_audio_loading, Snackbar.LENGTH_LONG).show();
+                //loading cache
+                File cacheDir = getCacheDir();
+                if(cacheDir != null) {
+                    for (File trackFile : cacheDir.listFiles()) {
+                        if (trackFile.getName().endsWith(".music")){
+
+                        }
+                    }
+                }
             }
             return null;
         }
@@ -520,8 +626,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         protected void onPostExecute(Map<LinearLayout, JSONObject> jsonObjectMap) {
             super.onPostExecute(tracksLayouts);
             MainActivity.tracksLayouts = jsonObjectMap;
-            Log.e("tracksList", tracksList.toString());
-            Log.e("tracksLayouts", tracksLayouts.toString());
             tracksProgressBar.setVisibility(View.GONE);
             if(tracksLayouts != null) {
                 synchronized (tracksLayout) {
@@ -625,16 +729,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     class CreateMediaPlayerFromFile extends CreateMediaPlayerFromURI {
         @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            mediaPlayer.setOnBufferingUpdateListener(null);
+        }
+
+        @Override
         protected Void doInBackground(String... strings) {
             synchronized (mediaPlayer) {
                 try {
                     mediaPlayer.setDataSource(strings[0]);
                     mediaPlayer.prepare();
-                } catch (IOException e) {
+                } catch ( IOException | RuntimeException e) {
                     Log.e(getClass().getSimpleName(), e.toString());
                 }
             }
             return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void unused) {
+            super.onPostExecute(unused);
+            currentTrackSeekBar.setSecondaryProgress(currentTrackSeekBar.getMax());
         }
     }
 
