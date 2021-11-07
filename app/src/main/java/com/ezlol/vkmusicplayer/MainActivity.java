@@ -39,7 +39,9 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.internal.NavigationMenu;
+import com.google.android.material.navigation.NavigationBarView;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.Snackbar;
 
@@ -78,6 +80,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     ImageView currentTrackImage, currentTrackBackBtn, currentTrackPauseBtn, currentTrackPlayBtn, currentTrackNextBtn;
     TextView currentTrackCurrentTime, currentTrackDuration, currentTrackName, currentTrackAuthor;
     SeekBar currentTrackSeekBar;
+
+    BottomNavigationView navView;
 
     MediaPlayer mediaPlayer = new MediaPlayer();
     NotificationManager notificationManager;
@@ -218,17 +222,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         LoadingAudio loadingAudioTask = new LoadingAudio();
         loadingAudioTask.execute();
 
-        //Nav
-        /*DrawerLayout drawer = findViewById(R.id.drawer_layout);
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
-                this, null, null, R.string.app_name, R.string.exit);
-        //drawer.setDrawerListener(toggle);
-        drawer.addDrawerListener(toggle);
-        toggle.syncState();
-
-        NavigationView navigationView = findViewById(R.id.nav_view);
-        navigationView.setNavigationItemSelectedListener(this);*/
-
         getSupportActionBar().hide();
 
         /*Toast.makeText(this, getCacheDir().toString(), Toast.LENGTH_LONG).show();
@@ -238,6 +231,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Toast.makeText(this, f.toString(), Toast.LENGTH_LONG).show();
             }
         }*/
+
+        navView = findViewById(R.id.nav_view);
+        navView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                switch(item.getItemId()){
+                    case R.id.navigation_settings:{
+                        Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
+                        startActivity(intent);
+                        break;
+                    }
+                }
+                return true;
+            }
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        navView.setSelectedItemId(R.id.navigation_home);
     }
 
     @Override
@@ -326,11 +340,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
 
             case R.id.bottomCurrentTrack:{
-                getSupportActionBar().show();
                 scrollView.setVisibility(View.GONE);
                 bottomCurrentTrackLayout.setVisibility(View.GONE);
                 exitBtn.setVisibility(View.GONE);
                 currentTrackLayout.setVisibility(View.VISIBLE);
+                navView.setVisibility(View.GONE);
+                getSupportActionBar().show();
                 isCurrentTrackLayoutShow = true;
                 new AudioHandlerTask().execute();
                 break;
@@ -386,6 +401,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public void onBackPressed() {
         if(isCurrentTrackLayoutShow) {
             getSupportActionBar().hide();
+            navView.setVisibility(View.VISIBLE);
             closeOptionsMenu();
             currentTrackLayout.setVisibility(View.GONE);
             scrollView.setVisibility(View.VISIBLE);
@@ -453,6 +469,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         .setSubText(CHANNEL_ID)
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .setOngoing(true)
+                        .setSound(null)
                         .setAutoCancel(true);
                 NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(this);
                 notificationManagerCompat.notify(NOTIFICATION_ID, n.build());
@@ -513,8 +530,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             tracksProgressBar.setVisibility(View.VISIBLE);
             if(tracksLayouts != null)
                 tracksLayouts.clear();
+            else
+                tracksLayouts = new HashMap<>();
             if(tracksList != null)
                 tracksList.clear();
+            else
+                tracksList = new ArrayList<>();
         }
 
         @Override
@@ -525,83 +546,53 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     try {
                         JSONArray response = jsonObject.getJSONArray("response");
                         if (response.length() > 0) {
+                            JSONObject savedTracksData = new JSONObject();
+                            try {
+                                savedTracksData = JSON.decode(
+                                        PreferenceManager
+                                                .getDefaultSharedPreferences(MainActivity.this)
+                                                .getString("tracksData", ""));
+                            }catch (Exception ignored){}
                             JSONArray tracks = response.getJSONObject(0).getJSONArray("items");
-
-                            ImageView trackImage;
-                            LinearLayout trackNamesLayout;
-                            TextView trackName, trackAuthor, trackDuration;
                             for (int i = 0; i < tracks.length(); i++) {
-                                JSONObject track = tracks.getJSONObject(i);
+                                JSONObject trackData = tracks.getJSONObject(i);
+                                savedTracksData.put(trackData.getString("id"), trackData);
 
-                                LinearLayout trackLayout = new LinearLayout(getApplicationContext());
-                                trackLayout.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                                trackLayout.setOrientation(LinearLayout.HORIZONTAL);
-                                trackLayout.setPadding((int) getResources().getDimension(R.dimen.trackLayoutLeftPadding),
-                                        (int) getResources().getDimension(R.dimen.trackLayoutTopPadding),
-                                        (int) getResources().getDimension(R.dimen.trackLayoutRightPadding),
-                                        (int) getResources().getDimension(R.dimen.trackLayoutBottomPadding));
+                                Track track = new Track(MainActivity.this, trackData);
 
-                                trackImage = new ImageView(getApplicationContext());
-                                trackImage.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-                                trackImage.getLayoutParams().height = (int) getResources().getDimension(R.dimen.trackImageHeight);
-                                trackImage.getLayoutParams().width = (int) getResources().getDimension(R.dimen.trackImageWidth);
-
-                                trackImage.setImageResource(R.drawable.ic_default_track_album);
+                                track.getImage().setImageResource(R.drawable.ic_default_track_album);
 
                                 Bitmap bitmap = null;
-                                if(tracksAlbums.containsKey(track.getInt("id"))){
-                                    bitmap = tracksAlbums.get(track.getInt("id"));
+                                if(tracksAlbums.containsKey(trackData.getInt("id"))){
+                                    bitmap = tracksAlbums.get(trackData.getInt("id"));
                                 }else {
                                     try {
-                                        URL urlConnection = new URL(track.getJSONObject("album").getJSONObject("thumb").getString(TRACK_ALBUM_PHOTO_QUALITY));
+                                        URL urlConnection = new URL(trackData
+                                                .getJSONObject("album")
+                                                .getJSONObject("thumb")
+                                                .getString(TRACK_ALBUM_PHOTO_QUALITY));
                                         HttpURLConnection connection = (HttpURLConnection) urlConnection
                                                 .openConnection();
                                         connection.setDoInput(true);
                                         connection.connect();
                                         InputStream input = connection.getInputStream();
                                         bitmap = BitmapFactory.decodeStream(input);
-                                        tracksAlbums.put(track.getInt("id"), bitmap);
+                                        tracksAlbums.put(trackData.getInt("id"), bitmap);
                                     } catch (IOException | JSONException ignored) {
                                         Log.e("Album loading error", track.toString());
                                     }
                                 }
                                 if(bitmap != null)
-                                    trackImage.setImageBitmap(bitmap);
+                                    track.getImage().setImageBitmap(bitmap);
 
-                                trackNamesLayout = new LinearLayout(getApplicationContext());
-                                trackNamesLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-                                trackNamesLayout.setOrientation(LinearLayout.VERTICAL);
-
-                                LinearLayout.LayoutParams trackNameAndAuthorParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                                trackNameAndAuthorParams.setMargins((int) getResources().getDimension(R.dimen.trackNameAndAuthorLeftMargin),
-                                        (int) getResources().getDimension(R.dimen.trackNameAndAuthorTopMargin),
-                                        (int) getResources().getDimension(R.dimen.trackNameAndAuthorRightMargin),
-                                        (int) getResources().getDimension(R.dimen.trackNameAndAuthorBottomMargin));
-
-                                trackName = new TextView(getApplicationContext());
-                                trackName.setLayoutParams(trackNameAndAuthorParams);
-                                trackName.setTypeface(Typeface.DEFAULT_BOLD);
-                                trackName.setText(track.getString("title"));
-
-                                trackAuthor = new TextView(getApplicationContext());
-                                trackAuthor.setLayoutParams(trackNameAndAuthorParams);
-                                trackAuthor.setText(track.getString("artist"));
-
-                                trackNamesLayout.addView(trackName);
-                                trackNamesLayout.addView(trackAuthor);
-
-                                trackDuration = new TextView(getApplicationContext());
-                                trackDuration.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
-                                trackDuration.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-                                trackDuration.setText(AppAPI.beautifySeconds(track.getInt("duration")));
-
-                                trackLayout.addView(trackImage);
-                                trackLayout.addView(trackNamesLayout);
-                                trackLayout.addView(trackDuration);
-
-                                tracksLayouts.put(trackLayout, track);
-                                tracksList.add(trackLayout);
+                                tracksLayouts.put(track.getLayout(), trackData);
+                                tracksList.add(track.getLayout());
                             }
+                            PreferenceManager
+                                    .getDefaultSharedPreferences(MainActivity.this)
+                                    .edit()
+                                    .putString("tracksData", savedTracksData.toString())
+                                    .apply();
                             return tracksLayouts;
                         }
                     } catch (JSONException e) {
@@ -610,13 +601,43 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
             }else{
                 //loading cache
+                //Toast.makeText(MainActivity.this, R.string.loading_cache, Toast.LENGTH_SHORT).show();
                 File cacheDir = getCacheDir();
                 if(cacheDir != null) {
-                    for (File trackFile : cacheDir.listFiles()) {
-                        if (trackFile.getName().endsWith(".music")){
+                    JSONObject tracksData = JSON.decode(
+                            PreferenceManager
+                                    .getDefaultSharedPreferences(MainActivity.this)
+                                    .getString("tracksData", "")
+                    ); // типо этого {<stringifyTrackID>:{"url":"https://..."...}...}
 
+                    Map<Track, String> tracksPaths = new HashMap<>();
+                    String trackName, trackID;
+                    for (File trackFile : cacheDir.listFiles()) {
+                        trackName = trackFile.getName();
+                        if (trackName.endsWith(".music")){
+                            trackID = trackName.replaceFirst("\\.music", "");
+                            Log.i("CacheLoader", trackID);
+
+                            JSONObject trackData;
+                            Track track;
+                            try {
+                                trackData = tracksData.getJSONObject(trackID);
+                            }catch (JSONException e) {
+                                trackData = new JSONObject();
+                                try {
+                                    trackData.put("artist", "Unknown artist");
+                                    trackData.put("title", "Unknown track");
+                                    trackData.put("duration", 0);
+                                } catch (JSONException ignored) {}
+                            }
+
+                            track = new Track(MainActivity.this, trackData);
+                            tracksLayouts.put(track.getLayout(), trackData);
+                            tracksList.add(track.getLayout());
+                            tracksPaths.put(track, trackFile.getAbsolutePath());
                         }
                     }
+                    return tracksLayouts;
                 }
             }
             return null;

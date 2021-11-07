@@ -12,7 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -93,7 +95,8 @@ public class AppAPI {
         private boolean isNeedCaptcha = false;
         private boolean isSuccess = false;
 
-        private final Requests.Session session = new Requests.Session();;
+        private final Requests.Session session = new Requests.Session();
+        ;
 
         double v = 5.95;
 
@@ -111,10 +114,10 @@ public class AppAPI {
             this.deviceID = "nwsrzy1efk4cewiq";
 
             Response r = session.get(String.format("https://oauth.vk.com/token?grant_type=password&scope=nohttps,audio&client_id=2274003&client_secret=hHbZxrka2uZ6jB1inYsH&username=%s&password=%s&v=5.131&2fa_supported=1", username, password), HEADERS);
-            if(r != null){
+            if (r != null) {
                 Log.e("RESPONSE 0", r.toString());
                 JSONObject response = r.json();
-                if(!response.has("error")){
+                if (!response.has("error")) {
                     try {
                         this.secret = response.getString("secret");
                         this.token = response.getString("access_token");
@@ -126,23 +129,24 @@ public class AppAPI {
                     } catch (JSONException ignored) {
                         throw new AuthException("Invalid username or password");
                     }
-                }else{
+                } else {
                     try {
                         String errorType = response.getString("error");
-                        switch (errorType){
-                            case "invalid_client":{
+                        switch (errorType) {
+                            case "invalid_client": {
                                 throw new AuthException("Invalid username or password");
                             }
-                            case "need_validation":{
+                            case "need_validation": {
                                 this.isNeedValidation = true;
                                 //throw new NeedValidationException("Need validation.", response.getString("validation_type"));
                             }
-                            case "need_captcha":{
+                            case "need_captcha": {
                                 this.isNeedCaptcha = true;
                                 //throw new NeedCaptchaException("Need captcha.");
                             }
                         }
-                    }catch (JSONException ignored){}
+                    } catch (JSONException ignored) {
+                    }
                 }
             }
         }
@@ -157,9 +161,9 @@ public class AppAPI {
 
         public boolean validate(String code, String username, String password, boolean forceSMS) throws AuthException {
             Response r = session.get(String.format("https://oauth.vk.com/token?grant_type=password&scope=nohttps,audio&client_id=2274003&client_secret=hHbZxrka2uZ6jB1inYsH&username=%s&password=%s&v=5.131&2fa_supported=1&code=%s&force_sms=", username, password, code, forceSMS ? "1" : "0"), HEADERS);
-            if(r != null){
+            if (r != null) {
                 JSONObject response = r.json();
-                if(!response.has("error")){
+                if (!response.has("error")) {
                     try {
                         this.secret = response.getString("secret");
                         this.token = response.getString("access_token");
@@ -172,7 +176,7 @@ public class AppAPI {
                     } catch (JSONException ignored) {
                         throw new AuthException("Invalid username or password");
                     }
-                }else{
+                } else {
                     Log.e("AppAPI", "Validation error: " + r);
                 }
             }
@@ -195,15 +199,17 @@ public class AppAPI {
             return deviceID;
         }
 
-        public String formRequest(String method, Map<String, String> params){
+        public String formRequest(String method, Map<String, String> params) {
             String url = String.format("/method/%s?v=%s&access_token=%s&device_id=%s", method, this.v, this.token, this.deviceID);
-            for (Map.Entry<String, String> e : params.entrySet()) {
-                url += "&" + e.getKey() + "=" + e.getValue();
+            if(params != null) {
+                for (Map.Entry<String, String> e : params.entrySet()) {
+                    url += "&" + e.getKey() + "=" + e.getValue();
+                }
             }
             return url;
         }
 
-        public JSONObject send(String url, Map<String, String> params){
+        public JSONObject send(String url, Map<String, String> params) {
             String hash;
             try {
                 MessageDigest md = MessageDigest.getInstance("MD5");
@@ -213,7 +219,7 @@ public class AppAPI {
             } catch (NoSuchAlgorithmException ignored) {
                 return null;
             }
-            if(params != null) {
+            if (params != null) {
                 for (Map.Entry<String, String> e : params.entrySet()) {
                     url += "&" + e.getKey() + "=" + e.getValue();
                 }
@@ -221,20 +227,30 @@ public class AppAPI {
 
             String allURL = "https://api.vk.com" + url + "&sig=" + hash;
             Response r = session.get(allURL, HEADERS);
-            if(r != null){
+            if (r != null) {
                 return r.json();
             }
             return null;
         }
 
-        public JSONObject getAudios(int count){
+        public JSONObject getAudios(int count) {
             Map<String, String> params = new HashMap<>();
             params.put("code", "return [API.audio.get({count:" + count + "})];");//,API.audio.getPlaylists({count:1,owner_id:API.users.get()[0].id})
-            return this.send(formRequest("execute", params), null);
+            return send(formRequest("execute", params), null);
         }
 
-        public JSONObject getAudios(){
+        public JSONObject getAudios() {
             return getAudios(100);
+        }
+
+        public JSONObject getAudioById(String ids){
+            Map<String, String> params = new HashMap<>();
+            params.put("code", "return [API.audio.getById({audios:" + ids + "})];");
+            return send(formRequest("execute", params), null);
+        }
+
+        public JSONObject getAudioById(List ids){
+            return getAudioById(join(ids));
         }
 
         private static String bytesToHex(byte[] bytes) {
@@ -251,5 +267,12 @@ public class AppAPI {
     @SuppressLint("DefaultLocale")
     public static String beautifySeconds(int seconds){
         return String.format("%02d:%02d", seconds / 60, seconds % 60);
+    }
+
+    private static String join(List list){
+        String s = "";
+        for(int i = 0; i < list.size(); i++)
+            s += list.get(i);
+        return s;
     }
 }

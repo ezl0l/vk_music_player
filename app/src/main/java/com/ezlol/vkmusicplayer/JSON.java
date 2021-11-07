@@ -17,7 +17,9 @@ public class JSON {
 
     public static boolean isSuccess(JSONObject jsonObject){
         try {
-            return jsonObject.has("success") && jsonObject.getBoolean("success");
+            return jsonObject != null
+                    && jsonObject.has("success")
+                    && jsonObject.getBoolean("success");
         } catch (JSONException ignored) {
             return false;
         }

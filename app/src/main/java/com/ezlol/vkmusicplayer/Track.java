@@ -1,4 +1,4 @@
-/* Потом, когда-ни
+/* Класс трека
  */
 
 package com.ezlol.vkmusicplayer;

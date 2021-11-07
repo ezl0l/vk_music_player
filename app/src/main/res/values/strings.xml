@@ -16,4 +16,6 @@
     <string name="delete">Delete</string>
     <string name="deleted">Deleted!</string>
     <string name="error">Error</string>
+    <string name="loading_cache">Loading cached tracks</string>
+    <!-- Preference Titles -->
 </resources>
