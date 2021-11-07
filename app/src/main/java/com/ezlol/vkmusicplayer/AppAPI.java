@@ -111,7 +111,7 @@ public class AppAPI {
         public Auth(String username, String password) throws AuthException, NeedValidationException, NeedCaptchaException {
             HEADERS.put("User-Agent", "VKAndroidApp/4.13.1-1206 (Android 4.4.3; SDK 19; armeabi; ; ru)");
             HEADERS.put("Accept", "image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, */*");
-            this.deviceID = "nwsrzy1efk4cewiq";
+            this.deviceID = "nwsrzy1efk4cewiq";//genDeviceID();
 
             Response r = session.get(String.format("https://oauth.vk.com/token?grant_type=password&scope=nohttps,audio&client_id=2274003&client_secret=hHbZxrka2uZ6jB1inYsH&username=%s&password=%s&v=5.131&2fa_supported=1", username, password), HEADERS);
             if (r != null) {

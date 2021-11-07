@@ -1,36 +1,24 @@
 package com.ezlol.vkmusicplayer;
 
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.ActionBarDrawerToggle;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
-
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Typeface;
 import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.Filter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -39,8 +27,12 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.material.internal.NavigationMenu;
 import com.google.android.material.navigation.NavigationBarView;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.Snackbar;
@@ -61,12 +53,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener,
         SeekBar.OnSeekBarChangeListener,
         MediaPlayer.OnCompletionListener,
         NavigationView.OnNavigationItemSelectedListener {
-    static String TRACK_ALBUM_PHOTO_QUALITY = "photo_135";
+    private static final String TRACK_ALBUM_PHOTO_QUALITY = "photo_135";
 
     AppAPI.Auth authLink;
 
@@ -84,7 +77,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     BottomNavigationView navView;
 
     MediaPlayer mediaPlayer = new MediaPlayer();
-    NotificationManager notificationManager;
 
     private int currentTrack = 0, currentTrackNumber = 0;
     static List<LinearLayout> tracksList = new ArrayList<>();
@@ -97,6 +89,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private final String CHANNEL_ID = "VK Music Player";
     private final int NOTIFICATION_ID = 101;
 
+    @SuppressLint("NonConstantResourceId")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -136,7 +129,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             private boolean deleteDir(File dir) {
                 if (dir != null && dir.isDirectory()) {
                     String[] children = dir.list();
-                    for (int i = 0; i < children.length; i++) {
+                    for (int i = 0; i < Objects.requireNonNull(children).length; i++) {
                         boolean success = deleteDir(new File(dir, children[i]));
                         if (!success) {
                             return false;
@@ -222,29 +215,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         LoadingAudio loadingAudioTask = new LoadingAudio();
         loadingAudioTask.execute();
 
-        getSupportActionBar().hide();
-
-        /*Toast.makeText(this, getCacheDir().toString(), Toast.LENGTH_LONG).show();
-        File dir = getCacheDir();
-        if (dir.exists()) {
-            for (File f : dir.listFiles()) {
-                Toast.makeText(this, f.toString(), Toast.LENGTH_LONG).show();
-            }
-        }*/
+        Objects.requireNonNull(getSupportActionBar()).hide();
 
         navView = findViewById(R.id.nav_view);
-        navView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
-            @Override
-            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-                switch(item.getItemId()){
-                    case R.id.navigation_settings:{
-                        Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
-                        startActivity(intent);
-                        break;
-                    }
+        navView.setOnItemSelectedListener(item -> {
+            switch(item.getItemId()){
+                case R.id.navigation_settings:{
+                    Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
+                    startActivity(intent);
+                    break;
                 }
-                return true;
+
+                case -1: break; // это чтобы студия не доставала с заменой на иф
             }
+            return true;
         });
     }
 
@@ -265,6 +249,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         return true;
     }
 
+    @SuppressLint("NonConstantResourceId")
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         switch(item.getItemId()){
@@ -318,12 +303,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private boolean deleteTrack(int trackID){
+        @SuppressLint("DefaultLocale")
         File trackFile = new File(getCacheDir(), String.format("%d.music", trackID));
         if(trackFile.exists())
             return trackFile.delete();
         return false;
     }
 
+    @SuppressLint("NonConstantResourceId")
     @Override
     public void onClick(View v) {
         switch (v.getId()) {
@@ -345,7 +332,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 exitBtn.setVisibility(View.GONE);
                 currentTrackLayout.setVisibility(View.VISIBLE);
                 navView.setVisibility(View.GONE);
-                getSupportActionBar().show();
+                Objects.requireNonNull(getSupportActionBar()).show();
                 isCurrentTrackLayoutShow = true;
                 new AudioHandlerTask().execute();
                 break;
@@ -400,7 +387,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     public void onBackPressed() {
         if(isCurrentTrackLayoutShow) {
-            getSupportActionBar().hide();
+            Objects.requireNonNull(getSupportActionBar()).hide();
             navView.setVisibility(View.VISIBLE);
             closeOptionsMenu();
             currentTrackLayout.setVisibility(View.GONE);
@@ -455,26 +442,26 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     public void setTrack(int trackNum){
+        //if(trackNum == currentTrack) return;
         try {
             Log.i("setTrackNumber", trackNum + "");
             LinearLayout trackLayout = tracksList.get(trackNum);
             JSONObject trackData = tracksLayouts.get(trackLayout);
+            if(trackData == null) return;
 
             //Change notification
-            if (trackData != null) {
-                NotificationCompat.Builder n = new NotificationCompat.Builder(this, CHANNEL_ID)
-                        .setSmallIcon(R.drawable.ic_default_track_album)
-                        .setContentTitle(trackData.getString("title"))
-                        .setContentText(trackData.getString("artist"))
-                        .setSubText(CHANNEL_ID)
-                        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                        .setOngoing(true)
-                        .setSound(null)
-                        .setAutoCancel(true);
-                NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(this);
-                notificationManagerCompat.notify(NOTIFICATION_ID, n.build());
-                currentTrack = trackData.getInt("id");
-            }
+            NotificationCompat.Builder n = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_default_track_album)
+                    .setContentTitle(trackData.getString("title"))
+                    .setContentText(trackData.getString("artist"))
+                    .setSubText(CHANNEL_ID)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setOngoing(true)
+                    .setSound(null)
+                    .setAutoCancel(true);
+            NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(this);
+            notificationManagerCompat.notify(NOTIFICATION_ID, n.build());
+            currentTrack = trackData.getInt("id");
             unselectAllTracks();
 
             currentTrackNumber = trackNum;
@@ -484,6 +471,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     BCTImage.setImageBitmap(tracksAlbums.get(trackData.getInt("id")));
                 }
 
+                @SuppressLint("DefaultLocale")
                 File trackFile = new File(getCacheDir(), String.format("%d.music", trackData.getInt("id")));
                 if(trackFile.exists()){
                     Log.i("setTrack", "Take a track from cache.");
@@ -610,9 +598,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                     .getString("tracksData", "")
                     ); // типо этого {<stringifyTrackID>:{"url":"https://..."...}...}
 
-                    Map<Track, String> tracksPaths = new HashMap<>();
+                    //Map<Track, String> tracksPaths = new HashMap<>();
                     String trackName, trackID;
-                    for (File trackFile : cacheDir.listFiles()) {
+                    for (File trackFile : Objects.requireNonNull(cacheDir.listFiles())) {
                         trackName = trackFile.getName();
                         if (trackName.endsWith(".music")){
                             trackID = trackName.replaceFirst("\\.music", "");
@@ -634,7 +622,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             track = new Track(MainActivity.this, trackData);
                             tracksLayouts.put(track.getLayout(), trackData);
                             tracksList.add(track.getLayout());
-                            tracksPaths.put(track, trackFile.getAbsolutePath());
+                            //tracksPaths.put(track, trackFile.getAbsolutePath());
                         }
                     }
                     return tracksLayouts;
@@ -649,20 +637,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             MainActivity.tracksLayouts = jsonObjectMap;
             tracksProgressBar.setVisibility(View.GONE);
             if(tracksLayouts != null) {
-                synchronized (tracksLayout) {
+                if(tracksLayout != null) {
                     tracksLayout.removeAllViews();
                 }
                 for (int i = 0; i < tracksList.size(); i++) {
                     LinearLayout trackLayout = tracksList.get(i);
                     //JSONObject trackData = tracksLayouts.get(trackLayout);
-                    trackLayout.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View view) {
-                            try {
-                                setTrack(tracksList.indexOf(trackLayout));
-                            } catch (Exception e) {
-                                Log.e("track onClick error", e.toString());
-                            }
+                    trackLayout.setOnClickListener(view -> {
+                        try {
+                            setTrack(tracksList.indexOf(trackLayout));
+                        } catch (Exception e) {
+                            Log.e("track onClick error", e.toString());
                         }
                     });
                     if(trackLayout.getParent() != null)
@@ -671,12 +656,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 }
                 new TrackAlbumLoading().execute();
             }else{
-                Snackbar.make(tracksLayout, R.string.failed_audio_loading, Snackbar.LENGTH_LONG).setAction(R.string.try_again, new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        new LoadingAudio().execute();
-                    }
-                }).show();
+                Snackbar.make(tracksLayout, R.string.failed_audio_loading, Snackbar.LENGTH_LONG).setAction(R.string.try_again, view -> new LoadingAudio().execute()).show();
             }
         }
     }

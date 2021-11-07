@@ -2,6 +2,7 @@ package com.ezlol.vkmusicplayer;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
@@ -52,6 +53,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
         validateBtn.setOnClickListener(this);
     }
 
+    @SuppressLint("NonConstantResourceId")
     @Override
     public void onClick(View view) {
         switch(view.getId()) {
@@ -105,7 +107,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
                     Intent intent = new Intent(getApplicationContext(), MainActivity.class);
                     startActivity(intent);
                     finish();
-                    return;
+                    //return;
                 }
             }
         }
