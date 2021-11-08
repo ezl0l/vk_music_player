@@ -87,7 +87,7 @@ public class AppAPI {
     }
 
     public static class Auth {
-        private static Map<String, String> HEADERS = new HashMap<>();
+        private static final Map<String, String> HEADERS = new HashMap<>();
 
         private String token, secret, deviceID;
         private JSONObject userData;
@@ -95,8 +95,9 @@ public class AppAPI {
         private boolean isNeedCaptcha = false;
         private boolean isSuccess = false;
 
+        private String userID = null;
+
         private final Requests.Session session = new Requests.Session();
-        ;
 
         double v = 5.95;
 
@@ -209,6 +210,15 @@ public class AppAPI {
             return url;
         }
 
+        public void refreshUserID(){
+            Map<String, String> p = new HashMap<>();
+            p.put("func_v", "9");
+            JSONObject r = this.send(this.formRequest("execute.getUserInfo", p), null);
+            try {
+                this.userID = r.getJSONObject("response").getJSONObject("profile").getString("id");
+            }catch (JSONException ignored){}
+        }
+
         public JSONObject send(String url, Map<String, String> params) {
             String hash;
             try {
@@ -245,8 +255,10 @@ public class AppAPI {
 
         public JSONObject getAudioById(String ids){
             Map<String, String> params = new HashMap<>();
-            params.put("code", "return [API.audio.getById({audios:" + ids + "})];");
-            return send(formRequest("execute", params), null);
+            //params.put("code", "return [API.audio.getById({audios:" + ids + "})];");
+            //return send(formRequest("execute", params), null);
+            params.put("audios", ids);
+            return send(formRequest("audio.getById", params), null);
         }
 
         public JSONObject getAudioById(List ids){
@@ -261,6 +273,12 @@ public class AppAPI {
                 sb = "0" + sb;
             }
             return sb;
+        }
+
+        public String addOwnerId2Id(String id){
+            if(this.userID == null)
+                refreshUserID();
+            return this.userID + "_" + id;
         }
     }
 

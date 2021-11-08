@@ -14,6 +14,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.util.Pair;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -33,7 +34,6 @@ import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.material.navigation.NavigationBarView;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.Snackbar;
 
@@ -50,6 +50,7 @@ import java.net.URL;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.ArrayList;
+import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,6 @@ import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener,
         SeekBar.OnSeekBarChangeListener,
-        MediaPlayer.OnCompletionListener,
         NavigationView.OnNavigationItemSelectedListener {
     private static final String TRACK_ALBUM_PHOTO_QUALITY = "photo_135";
 
@@ -66,7 +66,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     ScrollView scrollView;
     Button exitBtn;
     LinearLayout tracksLayout, bottomCurrentTrackLayout, currentTrackLayout;
-    ImageView BCTImage, BCTPlayBtn, BCTPauseBtn, BCTNextBtn;
+    ImageView BCTImage, BCTPlayBtn, BCTPauseBtn, BCTNextBtn, playlistAllTracks, playlistCachedTracks;
     TextView BCTName, BCTAuthor;
     ProgressBar tracksProgressBar;
 
@@ -79,9 +79,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     MediaPlayer mediaPlayer = new MediaPlayer();
 
     private int currentTrack = 0, currentTrackNumber = 0;
-    static List<LinearLayout> tracksList = new ArrayList<>();
-    static Map<LinearLayout, JSONObject> tracksLayouts = new HashMap<>();
-    static Map<Integer, Bitmap> tracksAlbums = new HashMap<>();
+    private static final Map<Integer, Bitmap> tracksAlbums = new HashMap<>();
+
+    private final List<Playlist> playlistsList = new ArrayList<>();
+    private final CachePlaylist cachePlaylist = new CachePlaylist();
+    private final Playlist mainPlaylist = new Playlist();
+    private Playlist currentPlaylist = mainPlaylist;
 
     private boolean isCurrentTrackLayoutShow = false;
     private boolean isAudioHandlerTaskWork = true;
@@ -120,10 +123,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         currentTrackAuthor = findViewById(R.id.currentTrackAuthor);
         currentTrackSeekBar = findViewById(R.id.currentTrackSeekBar);
 
+        playlistAllTracks = findViewById(R.id.playlist_all_tracks);
+        playlistCachedTracks = findViewById(R.id.playlist_cached_tracks);
+
         currentTrackBackBtn.setOnClickListener(this);
         currentTrackPauseBtn.setOnClickListener(this);
         currentTrackPlayBtn.setOnClickListener(this);
         currentTrackNextBtn.setOnClickListener(this);
+
+        playlistAllTracks.setOnClickListener(this);
+        playlistCachedTracks.setOnClickListener(this);
 
         findViewById(R.id.deleteCache).setOnClickListener(new View.OnClickListener() {
             private boolean deleteDir(File dir) {
@@ -195,7 +204,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         //Creating notification channel
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ID, "VK Music Player", NotificationManager.IMPORTANCE_DEFAULT);
+            NotificationChannel notificationChannel = new NotificationChannel(CHANNEL_ID,
+                    "VK Music Player",
+                    NotificationManager.IMPORTANCE_DEFAULT);
 
             //notificationChannel.setDescription(CHANNEL_ID);
 
@@ -230,6 +241,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
             return true;
         });
+        //Load albums photos
+
+        for(File file : Objects.requireNonNull(getCacheDir().listFiles())){
+            String fileName = file.getName();
+            Log.i("fileName", fileName);
+            if(fileName.endsWith(".jpg")) {
+                try {
+                    tracksAlbums.put(
+                            Integer.parseInt(fileName.replaceFirst("\\.jpg", "")),
+                            BitmapFactory.decodeFile(file.getAbsolutePath()));
+                }catch (Exception ignored){}
+            }
+        }
+
+        cachePlaylist.refreshTracks(this);
     }
 
     @Override
@@ -269,37 +295,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         return super.onOptionsItemSelected(item);
     }
 
-    private void saveTrack(int trackID, String trackURL){
-        Log.i("saveTrack", "trackID: " + trackID + " trackURL: " + trackURL);
-        String trackRealURL = AppAPI.newToMP3(trackURL);
-        if(trackRealURL.equals(trackURL)){
-            Toast.makeText(this, R.string.error_download_track, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        new TrackCachingMachine().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, String.valueOf(trackID), trackRealURL);
-    }
-
     private void saveTrack(int trackID){
-        Log.i("saveTrack", "success: processing");
-        JSONObject currentTrackData = null;
-        for(JSONObject trackData : tracksLayouts.values()){
-            try {
-                if (trackData.getInt("id") == trackID) {
-                    currentTrackData = trackData;
-                    break;
-                }
-            }catch (JSONException ignored){}
-        }
-        if(currentTrackData == null || !currentTrackData.has("url")){
-            Log.i("saveTrack", "Not found track or it doesn't have url.");
-            return;
-        }
-        try {
-            Log.i("saveTrack", "success: true");
-            saveTrack(trackID, currentTrackData.getString("url"));
-            return;
-        }catch (JSONException ignored){}
-        Log.i("saveTrack", "success: false");
+        new TrackCachingMachine().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, String.valueOf(trackID));
     }
 
     private boolean deleteTrack(int trackID){
@@ -326,7 +323,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 return; // ХЗ, надо ли раз есть finish(), но на всякий случай
             }
 
-            case R.id.bottomCurrentTrack:{
+            case R.id.bottomCurrentTrack: {
                 scrollView.setVisibility(View.GONE);
                 bottomCurrentTrackLayout.setVisibility(View.GONE);
                 exitBtn.setVisibility(View.GONE);
@@ -339,25 +336,44 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
 
             case R.id.BCTPlayBtn:
-            case R.id.currentTrackPlayBtn:{
+            case R.id.currentTrackPlayBtn: {
                 resumeTrack();
                 break;
             }
 
             case R.id.BCTPauseBtn:
-            case R.id.currentTrackPauseBtn:{
+            case R.id.currentTrackPauseBtn: {
                 pauseTrack();
                 break;
             }
 
             case R.id.BCTNextBtn:
-            case R.id.currentTrackNextBtn:{
+            case R.id.currentTrackNextBtn: {
                 setTrack(++currentTrackNumber);
                 break;
             }
 
-            case R.id.currentTrackBackBtn:{
+            case R.id.currentTrackBackBtn: {
                 setTrack(--currentTrackNumber);
+                break;
+            }
+
+            case R.id.playlist_all_tracks: {
+                setPlaylist(mainPlaylist);
+                break;
+            }
+
+            case R.id.playlist_cached_tracks: {
+                cachePlaylist.refreshTracks(this);
+                setPlaylist(cachePlaylist);
+                /*
+                Map<LinearLayout, JSONObject> cachedTracks = getCachedTracks();
+                if(cachedTracks != null) {
+                    drawTracks(new ArrayList<>(cachedTracks.keySet()));
+                } else {
+                    Toast.makeText(MainActivity.this, R.string.not_found_cached_tracks, Toast.LENGTH_SHORT).show();
+                    drawTracks(new ArrayList<>());
+                }*/
                 break;
             }
         }
@@ -430,23 +446,69 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mediaPlayer.start();
     }
 
-    @Override
-    public void onCompletion(MediaPlayer mediaPlayer) {
-
-    }
-
     private void unselectAllTracks(){
-        for(int i = 0; i < tracksList.size(); i++){
-            tracksList.get(i).setBackgroundResource(R.color.track_unselected);
+        List<Track> tracks = currentPlaylist.getTracks();
+        for(int i = 0; i < tracks.size(); i++){
+            tracks.get(i).getLayout().setBackgroundResource(R.color.track_unselected);
         }
     }
 
-    public void setTrack(int trackNum){
+    private void setPlaylist(Playlist playlist){
+        currentPlaylist = playlist;
+        drawAllTracks();
+    }
+
+    private void drawAllTracks(){
+        drawTracks(currentPlaylist.getTracks());
+    }
+
+    private void drawTracks(List<Track> tracksList){
+        if(tracksLayout == null)
+            return;
+        reloadAlbums();
+        for(int i = 0; i < tracksLayout.getChildCount(); i++) { // работает - и ладно!
+            tracksLayout.removeViewAt(i); // работает - и ладно!
+        } // работает - и ладно!
+        tracksLayout.removeAllViews(); // работает - и ладно!
+        Toast.makeText(this, tracksLayout.getChildCount() + "!", Toast.LENGTH_SHORT).show();
+        for (int i = 0; i < tracksList.size(); i++) {
+            Track track = tracksList.get(i);
+            LinearLayout trackLayout = track.getLayout();
+            //JSONObject trackData = tracksLayouts.get(trackLayout);
+            trackLayout.setOnClickListener(view -> {
+                try {
+                    setTrack(tracksList.indexOf(track));
+                } catch (Exception e) {
+                    Log.e("track onClick error", e.toString());
+                }
+            });
+            if(trackLayout.getParent() != null) // работает - и ладно!
+                ((ViewGroup) trackLayout.getParent()).removeView(trackLayout); // работает - и ладно!
+            tracksLayout.addView(trackLayout);
+        }
+        tracksLayout.requestLayout(); // работает - и ладно!
+    }
+
+    private void reloadAlbums(){
+        for(Track track : currentPlaylist.getTracks()){
+            JSONObject trackData = track.getData();
+            try {
+                int trackID = trackData.getInt("id");
+                if(tracksAlbums.containsKey(trackID)){
+                    track.getImage().setImageBitmap(tracksAlbums.get(trackID));
+                }
+            }catch (JSONException ignored){}
+        }
+    }
+
+    private void setTrack(int trackNum){
         //if(trackNum == currentTrack) return;
         try {
             Log.i("setTrackNumber", trackNum + "");
-            LinearLayout trackLayout = tracksList.get(trackNum);
-            JSONObject trackData = tracksLayouts.get(trackLayout);
+            List<Track> tracksList = currentPlaylist.getTracks();
+            Track track = tracksList.get(trackNum);
+            LinearLayout trackLayout = track.getLayout();
+            JSONObject trackData = track.getData();
             if(trackData == null) return;
 
             //Change notification
@@ -461,6 +523,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     .setAutoCancel(true);
             NotificationManagerCompat notificationManagerCompat = NotificationManagerCompat.from(this);
             notificationManagerCompat.notify(NOTIFICATION_ID, n.build());
+
             currentTrack = trackData.getInt("id");
             unselectAllTracks();
 
@@ -507,28 +570,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             currentTrackPauseBtn.setVisibility(View.VISIBLE);
             currentTrack = trackData.getInt("id");
         }catch (Exception e){
-            int s = Log.e("setTrack", "any error:" + e.toString());
+            Log.e("setTrack", "any error:" + e.toString());
         }
     }
 
-    class LoadingAudio extends AsyncTask<Void, Void, Map<LinearLayout, JSONObject>> {
+    class LoadingAudio extends AsyncTask<Void, Void, List<Track>> {
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
             tracksProgressBar.setVisibility(View.VISIBLE);
-            if(tracksLayouts != null)
-                tracksLayouts.clear();
-            else
-                tracksLayouts = new HashMap<>();
-            if(tracksList != null)
-                tracksList.clear();
-            else
-                tracksList = new ArrayList<>();
         }
 
         @Override
-        protected Map<LinearLayout, JSONObject> doInBackground(Void... voids) {
+        protected List<Track> doInBackground(Void... voids) {
             JSONObject jsonObject = authLink.getAudios();
+            List<Track> trackArrayList = new ArrayList<>();
             if(jsonObject != null){
                 if(jsonObject.has("response")) {
                     try {
@@ -550,7 +606,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                                 track.getImage().setImageResource(R.drawable.ic_default_track_album);
 
-                                Bitmap bitmap = null;
+                                /*Bitmap bitmap = null;
                                 if(tracksAlbums.containsKey(trackData.getInt("id"))){
                                     bitmap = tracksAlbums.get(trackData.getInt("id"));
                                 }else {
@@ -571,17 +627,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                     }
                                 }
                                 if(bitmap != null)
-                                    track.getImage().setImageBitmap(bitmap);
+                                    track.getImage().setImageBitmap(bitmap);*/
 
-                                tracksLayouts.put(track.getLayout(), trackData);
-                                tracksList.add(track.getLayout());
+                                mainPlaylist.addTrack(track);
+                                trackArrayList.add(track);
                             }
                             PreferenceManager
                                     .getDefaultSharedPreferences(MainActivity.this)
                                     .edit()
                                     .putString("tracksData", savedTracksData.toString())
                                     .apply();
-                            return tracksLayouts;
+                            return trackArrayList;
                         }
                     } catch (JSONException e) {
                         e.printStackTrace();
@@ -590,74 +646,21 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }else{
                 //loading cache
                 //Toast.makeText(MainActivity.this, R.string.loading_cache, Toast.LENGTH_SHORT).show();
-                File cacheDir = getCacheDir();
-                if(cacheDir != null) {
-                    JSONObject tracksData = JSON.decode(
-                            PreferenceManager
-                                    .getDefaultSharedPreferences(MainActivity.this)
-                                    .getString("tracksData", "")
-                    ); // типо этого {<stringifyTrackID>:{"url":"https://..."...}...}
-
-                    //Map<Track, String> tracksPaths = new HashMap<>();
-                    String trackName, trackID;
-                    for (File trackFile : Objects.requireNonNull(cacheDir.listFiles())) {
-                        trackName = trackFile.getName();
-                        if (trackName.endsWith(".music")){
-                            trackID = trackName.replaceFirst("\\.music", "");
-                            Log.i("CacheLoader", trackID);
-
-                            JSONObject trackData;
-                            Track track;
-                            try {
-                                trackData = tracksData.getJSONObject(trackID);
-                            }catch (JSONException e) {
-                                trackData = new JSONObject();
-                                try {
-                                    trackData.put("artist", "Unknown artist");
-                                    trackData.put("title", "Unknown track");
-                                    trackData.put("duration", 0);
-                                } catch (JSONException ignored) {}
-                            }
-
-                            track = new Track(MainActivity.this, trackData);
-                            tracksLayouts.put(track.getLayout(), trackData);
-                            tracksList.add(track.getLayout());
-                            //tracksPaths.put(track, trackFile.getAbsolutePath());
-                        }
-                    }
-                    return tracksLayouts;
-                }
+                return cachePlaylist.getTracks();
             }
             return null;
         }
 
         @Override
-        protected void onPostExecute(Map<LinearLayout, JSONObject> jsonObjectMap) {
-            super.onPostExecute(tracksLayouts);
-            MainActivity.tracksLayouts = jsonObjectMap;
+        protected void onPostExecute(List<Track> tracks) {
+            super.onPostExecute(tracks);
             tracksProgressBar.setVisibility(View.GONE);
-            if(tracksLayouts != null) {
-                if(tracksLayout != null) {
-                    tracksLayout.removeAllViews();
-                }
-                for (int i = 0; i < tracksList.size(); i++) {
-                    LinearLayout trackLayout = tracksList.get(i);
-                    //JSONObject trackData = tracksLayouts.get(trackLayout);
-                    trackLayout.setOnClickListener(view -> {
-                        try {
-                            setTrack(tracksList.indexOf(trackLayout));
-                        } catch (Exception e) {
-                            Log.e("track onClick error", e.toString());
-                        }
-                    });
-                    if(trackLayout.getParent() != null)
-                        ((ViewGroup) trackLayout.getParent()).removeView(trackLayout);
-                    tracksLayout.addView(trackLayout);
-                }
-                new TrackAlbumLoading().execute();
-            }else{
-                Snackbar.make(tracksLayout, R.string.failed_audio_loading, Snackbar.LENGTH_LONG).setAction(R.string.try_again, view -> new LoadingAudio().execute()).show();
+            if(tracksLayout != null) {
+                tracksLayout.removeAllViews();
             }
+            drawTracks(tracks);
+            new TrackAlbumLoading().execute();
+            // Snackbar.make(tracksLayout, R.string.failed_audio_loading, Snackbar.LENGTH_LONG).setAction(R.string.try_again, view -> new LoadingAudio().execute()).show();
         }
     }
 
@@ -689,13 +692,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     try {
                         mediaPlayer.setDataSource(urls[0]);
 
-                        mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                            @Override
-                            public void onCompletion(MediaPlayer mp) {
-                                //mediaPlayer.stop();
-                                Log.i("CreateMediaPlayer", "CMP onCompletion");
-                                //mediaPlayer.reset();
-                            }
+                        mediaPlayer.setOnCompletionListener(mp -> {
+                            //mediaPlayer.stop();
+                            Log.i("CreateMediaPlayer", "CMP onCompletion");
+                            //mediaPlayer.reset();
                         });
 
                         mediaPlayer.prepare();
@@ -720,9 +720,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             mediaPlayer.setOnCompletionListener(mediaPlayer -> {
                 currentTrackSeekBar.setProgress(0);
-                Log.e("tracksList", tracksList.toString() + currentTrackNumber);
-                Log.e("tracksLayouts", tracksLayouts.toString());
-                Log.e("SETTRACK", currentTrackNumber + "");
                 setTrack(++currentTrackNumber);
             });
         }
@@ -799,18 +796,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     class TrackAlbumLoading extends AsyncTask<Void, Void, Void> {
         @Override
         protected Void doInBackground(Void... voids) {
-            for(JSONObject track : tracksLayouts.values()){
+            for(Track track : currentPlaylist.getTracks()){
+                JSONObject trackData = track.getData();
                 try {
-                    int trackID = track.getInt("id");
+                    int trackID = trackData.getInt("id");
                     if(!tracksAlbums.containsKey(trackID)) {
-                        URL urlConnection = new URL(track.getJSONObject("album").getJSONObject("thumb").getString(TRACK_ALBUM_PHOTO_QUALITY));
+                        URL urlConnection = new URL(trackData.getJSONObject("album").getJSONObject("thumb").getString(TRACK_ALBUM_PHOTO_QUALITY));
                         HttpURLConnection connection = (HttpURLConnection) urlConnection
                                 .openConnection();
                         connection.setDoInput(true);
                         connection.connect();
                         InputStream input = connection.getInputStream();
                         Bitmap b = BitmapFactory.decodeStream(input);
+
                         tracksAlbums.put(trackID, b);
+
+                        File file = new File(getCacheDir(), trackID + ".jpg");
+                        FileOutputStream fOut = new FileOutputStream(file);
+
+                        b.compress(Bitmap.CompressFormat.JPEG, 100, fOut);
+                        fOut.flush();
+                        fOut.close();
+
                         Log.i("TrackAlbumLoader", "Loaded track album with ID " + trackID);
                     }
                 }catch (IOException | JSONException ignored){}
@@ -821,6 +828,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         protected void onPostExecute(Void unused) {
             super.onPostExecute(unused);
+            for(Track track : currentPlaylist.getTracks()) {
+                JSONObject trackData = track.getData();
+                try {
+                    int trackID = trackData.getInt("id");
+                    if(tracksAlbums.containsKey(trackID)){
+                        track.getImage().setImageBitmap(tracksAlbums.get(trackID));
+                    }
+                }catch (JSONException ignored){}
+            }
             Log.i("TrackAlbumLoader", "All albums have been loaded.");
         }
     }
@@ -828,9 +844,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     class TrackCachingMachine extends AsyncTask<String, Void, Boolean> {
         @Override
         protected Boolean doInBackground(String... strings) {
+            String trackURL = null;
+            try {
+                JSONObject audioResponse = authLink.getAudioById(authLink.addOwnerId2Id(strings[0]));
+                Log.i("audioResponse", strings[0] + " - " + audioResponse.toString());
+                if(audioResponse.has("response")){
+                    JSONArray audioData = audioResponse.getJSONArray("response");
+                    trackURL = AppAPI.newToMP3(audioData.getJSONObject(0).getString("url"));
+                }
+            }catch (JSONException e){
+                Log.e("JSONException", e.toString());
+                return false;
+            }
+            if(trackURL == null)
+                return false;
+
             Log.i("TrackCachingMachine", "Start track saving");
             try {
-                URL website = new URL(strings[1]);
+                URL website = new URL(trackURL);
                 ReadableByteChannel rbc = Channels.newChannel(website.openStream());
                 FileOutputStream fos = new FileOutputStream(new File(getCacheDir(), strings[0] + ".music"));
                 fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);

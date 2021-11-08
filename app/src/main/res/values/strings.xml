@@ -17,5 +17,6 @@
     <string name="deleted">Deleted!</string>
     <string name="error">Error</string>
     <string name="loading_cache">Loading cached tracks</string>
+    <string name="not_found_cached_tracks">Not found cached tracks</string>
     <!-- Preference Titles -->
 </resources>

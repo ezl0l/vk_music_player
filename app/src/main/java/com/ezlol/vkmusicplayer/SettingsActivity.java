@@ -1,3 +1,4 @@
+//TODO
 package com.ezlol.vkmusicplayer;
 
 import android.app.Activity;
