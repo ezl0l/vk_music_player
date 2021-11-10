@@ -3,18 +3,20 @@ package com.ezlol.vkmusicplayer;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.preference.PreferenceActivity;
+import android.preference.PreferenceFragment;
 import android.view.View;
 import android.widget.Toolbar;
 
 import androidx.annotation.Nullable;
 
-public class SettingsActivity extends Activity {
+public class SettingsActivity extends PreferenceFragment {
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_settings);
+        addPreferencesFromResource(R.xml.root_preferences);
 
-        Toolbar toolbar = findViewById(R.id.toolbar);
+        /*Toolbar toolbar = findViewById(R.id.toolbar);
         setActionBar(toolbar);
 
         getActionBar().setDisplayHomeAsUpEnabled(true);
@@ -25,6 +27,6 @@ public class SettingsActivity extends Activity {
             public void onClick(View view) {
                 onBackPressed();
             }
-        });
+        });*/
     }
 }

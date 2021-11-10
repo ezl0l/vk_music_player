@@ -79,6 +79,12 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
 
     class AuthTask extends AsyncTask<Void, Void, AppAPI.Auth> {
         @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            signInBtn.setEnabled(false);
+        }
+
+        @Override
         protected AppAPI.Auth doInBackground(Void... voids) {
             try {
                 return new AppAPI.Auth(usernameEditText.getText().toString(), passwordEditText.getText().toString());
@@ -92,6 +98,7 @@ public class LoginActivity extends AppCompatActivity implements View.OnClickList
         @Override
         protected void onPostExecute(AppAPI.Auth link) {
             super.onPostExecute(authLink);
+            signInBtn.setEnabled(true);
             authLink = link;
             if(authLink != null) {
                 if(authLink.isNeedValidation()) {

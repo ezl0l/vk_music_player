@@ -215,6 +215,7 @@ public class AppAPI {
             p.put("func_v", "9");
             JSONObject r = this.send(this.formRequest("execute.getUserInfo", p), null);
             try {
+                Log.i("r", r.toString());
                 this.userID = r.getJSONObject("response").getJSONObject("profile").getString("id");
             }catch (JSONException ignored){}
         }
@@ -253,6 +254,12 @@ public class AppAPI {
             return getAudios(100);
         }
 
+        public JSONObject getAudios(int count, int albumID){
+            Map<String, String> params = new HashMap<>();
+            params.put("code", "return [API.audio.get({count:" + count + ",album_id:" + albumID + "})];");//,API.audio.getPlaylists({count:1,owner_id:API.users.get()[0].id})
+            return send(formRequest("execute", params), null);
+        }
+
         public JSONObject getAudioById(String ids){
             Map<String, String> params = new HashMap<>();
             //params.put("code", "return [API.audio.getById({audios:" + ids + "})];");
@@ -263,6 +270,25 @@ public class AppAPI {
 
         public JSONObject getAudioById(List ids){
             return getAudioById(join(ids));
+        }
+
+        public JSONObject getPlaylists(int ownerID, int count, int offset, boolean extended){
+            Map<String, String> params = new HashMap<>();
+            params.put("owner_id", String.valueOf(ownerID));
+            params.put("count", String.valueOf(count));
+            params.put("offset", String.valueOf(offset));
+            params.put("extended", extended ? "1" : "0");
+            return send(formRequest("audio.getPlaylists", params), null);
+        }
+
+        public JSONObject getPlaylists(int ownerID) {
+            return getPlaylists(ownerID, 20, 0, false);
+        }
+
+        public JSONObject getPlaylists() {
+            if(this.userID == null)
+                refreshUserID();
+            return getPlaylists(Integer.parseInt(this.userID));
         }
 
         private static String bytesToHex(byte[] bytes) {
@@ -279,6 +305,10 @@ public class AppAPI {
             if(this.userID == null)
                 refreshUserID();
             return this.userID + "_" + id;
+        }
+
+        public String getUserID() {
+            return userID;
         }
     }
 

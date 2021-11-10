@@ -18,6 +18,7 @@ public class CachePlaylist extends Playlist {
 
     public CachePlaylist(){
         super();
+        super.isUntouchable = true;
     }
 
     public void refreshTracks(Context c){
@@ -49,7 +50,7 @@ public class CachePlaylist extends Playlist {
                             trackData.put("duration", 0);
                         } catch (JSONException ignored) {}
                     }
-                    super.addTrack(new Track(c, trackData));
+                    super.addTrack(new Track(trackData));
                 }
             }
         }

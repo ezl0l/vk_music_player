@@ -31,8 +31,9 @@
     <ScrollView
         android:id="@+id/scrollView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
         android:layout_marginTop="100dp"
+        app:layout_constraintBottom_toTopOf="@+id/bottomCurrentTrack"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
@@ -59,8 +60,8 @@
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_marginStart="5dp">
+                        android:layout_marginStart="5dp"
+                        android:orientation="vertical">
 
                         <ImageView
                             android:id="@+id/playlist_all_tracks"
@@ -79,8 +80,8 @@
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_marginStart="5dp">
+                        android:layout_marginStart="5dp"
+                        android:orientation="vertical">
 
                         <ImageView
                             android:id="@+id/playlist_cached_tracks"
@@ -93,7 +94,7 @@
                             android:layout_height="wrap_content"
                             android:layout_gravity="center"
                             android:layout_marginTop="5dp"
-                            android:text="Cached audios" />
+                            android:text="Cached tracks" />
                     </LinearLayout>
                 </LinearLayout>
             </HorizontalScrollView>
@@ -115,7 +116,8 @@
                     android:paddingTop="5dp"
                     android:paddingRight="5dp"
                     android:paddingBottom="5dp"
-                    android:visibility="gone">
+                    android:visibility="gone"
+                    tools:visibility="visible">
 
                     <ImageView
                         android:id="@+id/trackImage"
@@ -145,61 +147,34 @@
                             android:text="In Evil Hour" />
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/trackDuration"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
-                        android:gravity="right|center_vertical"
-                        android:text="0:00" />
-
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/track1"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="#E6E6E6"
-                    android:orientation="horizontal"
-                    android:paddingLeft="10dp"
-                    android:paddingTop="5dp"
-                    android:paddingRight="5dp"
-                    android:paddingBottom="5dp"
-                    android:visibility="gone">
-
-                    <ImageView
-                        android:id="@+id/trackImage1"
-                        android:layout_width="50dp"
-                        android:layout_height="50dp"
-                        android:src="@color/purple_200" />
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
                         android:orientation="vertical">
 
-                        <TextView
-                            android:id="@+id/trackName1"
+                        <RelativeLayout
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginLeft="10dp"
-                            android:text="Built on our backs"
-                            android:textAllCaps="false"
-                            android:textStyle="bold" />
+                            android:layout_height="wrap_content">
 
-                        <TextView
-                            android:id="@+id/trackAuthor1"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginLeft="10dp"
-                            android:text="In Evil Hour" />
+                            <ImageView
+                                android:id="@+id/imageView"
+                                android:layout_width="15dp"
+                                android:layout_height="15dp"
+                                android:layout_alignParentEnd="true"
+                                android:layout_gravity="end"
+                                app:srcCompat="@drawable/ic_save_icon" />
+
+                            <TextView
+                                android:id="@+id/trackDuration"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:layout_alignParentEnd="false"
+                                android:layout_marginEnd="15dp"
+                                android:gravity="right|center_vertical"
+                                android:text="0:00" />
+                        </RelativeLayout>
+
                     </LinearLayout>
-
-                    <TextView
-                        android:id="@+id/trackDuration1"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="right|center_vertical"
-                        android:text="0:00" />
 
                 </LinearLayout>
             </LinearLayout>
@@ -210,7 +185,6 @@
         android:id="@+id/bottomCurrentTrack"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="56dp"
         android:background="#FFFFFFFF"
         android:orientation="horizontal"
         android:paddingLeft="@dimen/trackLayoutLeftPadding"
@@ -218,9 +192,10 @@
         android:paddingRight="@dimen/trackLayoutRightPadding"
         android:paddingBottom="@dimen/trackLayoutBottomPadding"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="@+id/scrollView"
+        app:layout_constraintBottom_toTopOf="@+id/nav_view"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
+        app:layout_constraintStart_toStartOf="parent"
+        tools:visibility="visible">
 
         <ImageView
             android:id="@+id/BCTImage"

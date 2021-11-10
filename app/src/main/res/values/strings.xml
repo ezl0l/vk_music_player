@@ -18,5 +18,6 @@
     <string name="error">Error</string>
     <string name="loading_cache">Loading cached tracks</string>
     <string name="not_found_cached_tracks">Not found cached tracks</string>
-    <!-- Preference Titles -->
+    <string name="cache_playlist_title">Cached audios</string>
+    <string name="main_playlist_title">My audios</string>
 </resources>

@@ -14,4 +14,11 @@
     <dimen name="activity_vertical_margin">16dp</dimen>
     <dimen name="nav_header_vertical_spacing">8dp</dimen>
     <dimen name="nav_header_height">176dp</dimen>
+    <dimen name="playlistLayoutLeftMargin">5dp</dimen>
+    <dimen name="playlistImageWidth">126dp</dimen>
+    <dimen name="playlistImageHeight">126dp</dimen>
+    <dimen name="playlistTextTopMargin">5dp</dimen>
+    <dimen name="trackDurationRightMargin">15dp</dimen>
+    <dimen name="cachedTrackImageWidth">15dp</dimen>
+    <dimen name="cachedTrackImageHeight">15dp</dimen>
 </resources>
